@@ -723,6 +723,26 @@ std::unordered_set<uint32> AuctionHouseBot::GetItemIDsProducedByRecipes()
     return recipeItemIDs;
 }
 
+// Items with neither a sell or a buy price, with exception of item enhancements and enchanting trade goods
+bool AuctionHouseBot::IsItemWithoutVendorPrice(ItemTemplate const* itemTemplate)
+{
+    if (itemTemplate->SellPrice != 0 || itemTemplate->BuyPrice != 0)
+        return false;
+    if (itemTemplate->Class == ITEM_CLASS_TRADE_GOODS && itemTemplate->SubClass == ITEM_SUBCLASS_ENCHANTING)
+        return false;
+    if (itemTemplate->Class == ITEM_CLASS_CONSUMABLE && itemTemplate->SubClass == ITEM_SUBCLASS_ITEM_ENHANCEMENT)
+        return false;
+    return true;
+}
+
+// Items with a price set by CompleteItemValueOverride.Items or PriceMinimumCenterBase.OverrideItems
+bool AuctionHouseBot::HasConfiguredPrice(uint32 itemID)
+{
+    if (CompleteItemValueOverrideEnabled == true && CompleteItemValueOverrideItemListByItemID.find(itemID) != CompleteItemValueOverrideItemListByItemID.end())
+        return true;
+    return PriceMinimumCenterBaseOverridesByItemID.find(itemID) != PriceMinimumCenterBaseOverridesByItemID.end();
+}
+
 bool AuctionHouseBot::IsItemADisabledRecipeProducedClassSubclass(ItemTemplate const* itemTemplate)
 {
     if (DisabledRecipeProducedItemClassSubClasses.find(itemTemplate->Class) == DisabledRecipeProducedItemClassSubClasses.end())
@@ -738,18 +758,6 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
 {
     // Clear old list and rebuild it
     ItemCandidatesByItemClassAndQuality.clear();
-
-    // Item include exceptions
-    set<uint32> includeItemIDExecptions;
-    includeItemIDExecptions.insert(11732);
-    includeItemIDExecptions.insert(11733);
-    includeItemIDExecptions.insert(11734);
-    includeItemIDExecptions.insert(11736);
-    includeItemIDExecptions.insert(11737);
-    includeItemIDExecptions.insert(18332);
-    includeItemIDExecptions.insert(18333);
-    includeItemIDExecptions.insert(18334);
-    includeItemIDExecptions.insert(18335);
 
     ItemIDsProducedByRecipes.clear();
     ItemIDsProducedByRecipes = GetItemIDsProducedByRecipes();
@@ -861,7 +869,7 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
         }
 
         // These items should be included and would otherwise be skipped due to conditions below
-        if (includeItemIDExecptions.find(itr->second.ItemId) != includeItemIDExecptions.end())
+        if (IncludedItems.find(itr->second.ItemId) != IncludedItems.end())
         {
             ItemCandidatesByItemClassAndQuality[itr->second.Class][itr->second.Quality].push_back(itr->second.ItemId);
             continue;
@@ -953,11 +961,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
             continue;
         }
 
-        // Disable all items that have neither a sell or a buy price, with exception of item enhancements and trade goods
-        bool isEnchantingTradeGood = (itr->second.Class == ITEM_CLASS_TRADE_GOODS && itr->second.SubClass == ITEM_SUBCLASS_ENCHANTING);
-        bool isItemEnhancement = (itr->second.Class == ITEM_CLASS_CONSUMABLE && itr->second.SubClass == ITEM_SUBCLASS_ITEM_ENHANCEMENT);
-        bool hasNoPrice = (itr->second.SellPrice == 0 && itr->second.BuyPrice == 0);
-        if (hasNoPrice == true && isItemEnhancement == false && isEnchantingTradeGood == false)
+        // Disable all items that have neither a sell or a buy price, unless a price is configured for them
+        if (IsItemWithoutVendorPrice(&itr->second) && !HasConfiguredPrice(itr->second.ItemId))
         {
             if (debug_Out_Filters)
                 LOG_ERROR("module", "AuctionHouseBot: Item {} disabled misc item", itr->second.ItemId);
@@ -1721,6 +1726,14 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
             continue;
         }
 
+        // Items without a vendor price are only worth what the config says, so don't turn them into gold
+        if (BuyerSkipItemsWithoutVendorPrice == true && IsItemWithoutVendorPrice(prototype))
+        {
+            if (debug_Out)
+                LOG_INFO("module", "AHBuyer: Item {} for auction {} has no vendor price, skipping (Buyer.SkipItemsWithoutVendorPrice)", prototype->ItemId, auction->Id);
+            continue;
+        }
+
         // Calculate a potential price for the item
         uint64 willingToSpendPerItemPrice = 0;
         uint64 discardBidPrice = 0;
@@ -1962,6 +1975,7 @@ void AuctionHouseBot::InitializeConfiguration()
 
     // Top level overrides
     CompleteItemValueOverrideEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.CompleteItemValueOverride.Enabled", false);
+    CompleteItemValueOverrideItemListByItemID.clear();
     AddItemValuePairsToItemIDMap(CompleteItemValueOverrideItemListByItemID, sConfigMgr->GetOption<std::string>("AuctionHouseBot.CompleteItemValueOverride.Items", ""));
     CompleteItemValueOverrideDoApplyBidVariations = sConfigMgr->GetOption<bool>("AuctionHouseBot.CompleteItemValueOverride.DoApplyBidVariations", false);
     CompleteItemValueOverrideDoApplyBuyoutVariations = sConfigMgr->GetOption<bool>("AuctionHouseBot.CompleteItemValueOverride.DoApplyBuyoutVariations", false);
@@ -2015,6 +2029,7 @@ void AuctionHouseBot::InitializeConfiguration()
     BuyingBotAcceptablePriceModifier = sConfigMgr->GetOption<float>("AuctionHouseBot.Buyer.AcceptablePriceModifier", 1);
     BuyingBotAlwaysBidMaxCalculatedPrice = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.AlwaysBidMaxCalculatedPrice", false);
     PreventOverpayingForVendorItems = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.PreventOverpayingForVendorItems", true);
+    BuyerSkipItemsWithoutVendorPrice = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.SkipItemsWithoutVendorPrice", false);
     if (PreventOverpayingForVendorItems)
         PopulateVendorItemsPrices();
     BuyingBotWillBidAgainstPlayers = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.BidAgainstPlayers", false);
@@ -2191,6 +2206,7 @@ void AuctionHouseBot::InitializeConfiguration()
     PriceMinimumCenterBaseKey = sConfigMgr->GetOption<uint32>("AuctionHouseBot.PriceMinimumCenterBase.Key", 1000);
     PriceMinimumCenterBaseMisc = sConfigMgr->GetOption<uint32>("AuctionHouseBot.PriceMinimumCenterBase.Misc", 1000);
     PriceMinimumCenterBaseGlyph = sConfigMgr->GetOption<uint32>("AuctionHouseBot.PriceMinimumCenterBase.Glyph", 1000);
+    PriceMinimumCenterBaseOverridesByItemID.clear();
     AddItemValuePairsToItemIDMap(PriceMinimumCenterBaseOverridesByItemID, sConfigMgr->GetOption<std::string>("AuctionHouseBot.PriceMinimumCenterBase.OverrideItems", ""));
 
     // Item level Restrictions
@@ -2221,6 +2237,9 @@ void AuctionHouseBot::InitializeConfiguration()
     DisabledItems.clear();
     ParseNumberListToSet(DisabledItems, sConfigMgr->GetOption<std::string>("AuctionHouseBot.DisabledInvalidItemIDs", ""), "AuctionHouseBot.DisabledInvalidItemIDs");
     ParseNumberListToSet(DisabledItems, sConfigMgr->GetOption<std::string>("AuctionHouseBot.DisabledCustomItemIDs", ""), "AuctionHouseBot.DisabledCustomItemIDs");
+    IncludedItems.clear();
+    ParseNumberListToSet(IncludedItems, sConfigMgr->GetOption<std::string>("AuctionHouseBot.IncludedItemIDs", "11732-11734,11736,11737,18332-18335"), "AuctionHouseBot.IncludedItemIDs");
+    DisabledRecipeProducedItemClassSubClasses.clear();
     AddValuesToSetByKeyMap(DisabledRecipeProducedItemClassSubClasses, sConfigMgr->GetOption<std::string>("AuctionHouseBot.DisabledRecipeProducedItemClassSubClasses", ""), 0, 20);
 
     if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION))

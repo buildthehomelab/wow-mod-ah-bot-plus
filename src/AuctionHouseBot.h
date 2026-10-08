@@ -161,6 +161,7 @@ private:
     std::unordered_set<uint32> ItemIDsProducedByRecipes;
     std::map<uint32, std::unordered_set<uint32>> DisabledRecipeProducedItemClassSubClasses;
     std::set<uint32> DisabledItems;
+    std::set<uint32> IncludedItems;
     bool ListedItemLevelRestrictedEnabled;
     bool ListedItemLevelRestrictedUseCraftedItemForCalculation;
     uint32 ListedItemLevelMin;
@@ -310,6 +311,7 @@ private:
     uint32 ListedItemIDMax;
     std::set<uint32> ListedItemIDExceptionItems;
     bool PreventOverpayingForVendorItems;
+    bool BuyerSkipItemsWithoutVendorPrice;
     std::unordered_map<uint32, double> CachedItemDropRates;
     std::vector<std::vector<std::vector<std::vector<uint32>>>> ItemTiersByClassAndQuality;  // [Classes][Qualities][Tiers] .. [17][7][configurable]
     std::map<double, int, std::greater<double>> DropRatesToTierMap;
@@ -374,6 +376,8 @@ public:
     ItemTemplate const* GetProducedItemFromRecipe(ItemTemplate const* recipeItemTemplate);
     std::unordered_set<uint32> GetItemIDsProducedByRecipes();
     bool IsItemADisabledRecipeProducedClassSubclass(ItemTemplate const* itemTemplate);
+    bool IsItemWithoutVendorPrice(ItemTemplate const* itemTemplate);
+    bool HasConfiguredPrice(uint32 itemID);
     void PopulateItemCandidatesAndProportions();
     uint32 GetRandomItemIDForListing();
     void AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpecificAuctionHouseConfig* config);
