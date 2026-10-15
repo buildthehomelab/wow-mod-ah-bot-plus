@@ -1661,27 +1661,30 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         return;
     }
 
-    // Pull currentAuctionItemListCount.
-    string queryString = "SELECT id FROM auctionhouse WHERE itemowner NOT IN ({}) AND buyguid NOT IN ({})";
-    if (BuyingBotWillBidAgainstPlayers == false)
-        queryString = "SELECT id FROM auctionhouse WHERE itemowner NOT IN ({}) AND buyguid NOT IN ({}) AND lastbid = 0";
-    QueryResult result = CharacterDatabase.Query(queryString, AHCharactersGUIDsForQuery, AHCharactersGUIDsForQuery);
-
-    if (!result)
-        return;
-
-    if (result->GetRowCount() == 0)
-        return;
-
     // Fetches content of selected AH
     AuctionHouseObject* auctionHouse =  sAuctionMgr->GetAuctionsMap(config->GetAHFID());
-    vector<uint32> possibleBids;
+    if (!auctionHouse)
+        return;
 
-    do
+    // Candidates come from this house's auctions in memory, which the core keeps in step with
+    // the auctionhouse table. A query here scanned the whole table (every house, NOT IN on
+    // unindexed columns) on the world thread once per house per buy cycle.
+    std::set<ObjectGuid::LowType> ahBotGUIDs;
+    for (AuctionHouseBotCharacter const& botCharacter : AHCharacters)
+        ahBotGUIDs.insert(botCharacter.CharacterGUID);
+
+    vector<uint32> possibleBids;
+    for (auto const& [auctionID, auctionEntry] : auctionHouse->GetAuctions())
     {
-        uint32 tmpdata = result->Fetch()->Get<uint32>();
-        possibleBids.push_back(tmpdata);
-    } while (result->NextRow());
+        if (ahBotGUIDs.count(auctionEntry->owner.GetCounter()) || ahBotGUIDs.count(auctionEntry->bidder.GetCounter()))
+            continue;
+        if (BuyingBotWillBidAgainstPlayers == false && auctionEntry->bid != 0)
+            continue;
+        possibleBids.push_back(auctionID);
+    }
+
+    if (possibleBids.empty())
+        return;
 
     int randBuyingBotBuyCandidatesPerBuyCycle = urand(BuyingBotBuyCandidatesPerBuyCycleMin, BuyingBotBuyCandidatesPerBuyCycleMax);
     for (int count = 1; count <= randBuyingBotBuyCandidatesPerBuyCycle; ++count)
