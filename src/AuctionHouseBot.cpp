@@ -284,8 +284,12 @@ uint32 AuctionHouseBot::GetStackSizeForItem(ItemTemplate const* itemProto) const
         return 1;
 }
 
-void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& outBidPrice, uint64& outBuyoutPrice)
+void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& outBidPrice, uint64& outBuyoutPrice, bool referenceQuote)
 {
+    auto priceRange = [referenceQuote](uint32 low, uint32 high) -> uint32
+    {
+        return referenceQuote ? high : urand(low, high);
+    };
     if (CompleteItemValueOverrideEnabled == true)
     {
         auto it = CompleteItemValueOverrideItemListByItemID.find(itemProto->ItemId);
@@ -293,13 +297,13 @@ void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& 
         {
             outBuyoutPrice = it->second;
             if (CompleteItemValueOverrideDoApplyBuyoutVariations == true)
-                outBuyoutPrice = urand(outBuyoutPrice * (1.0f - BuyoutVariationReducePercent), outBuyoutPrice * (1.0f + BuyoutVariationAddPercent));
+                outBuyoutPrice = priceRange(outBuyoutPrice * (1.0f - BuyoutVariationReducePercent), outBuyoutPrice * (1.0f + BuyoutVariationAddPercent));
 
             if (CompleteItemValueOverrideDoApplyBidVariations == true)
             {
                 float sellVarianceBidPriceTopPercent = 1.0f - BidVariationHighReducePercent;
                 float sellVarianceBidPriceBottomPercent = 1.0f - BidVariationLowReducePercent;
-                outBidPrice = urand(sellVarianceBidPriceBottomPercent * outBuyoutPrice, sellVarianceBidPriceTopPercent * outBuyoutPrice);
+                outBidPrice = priceRange(sellVarianceBidPriceBottomPercent * outBuyoutPrice, sellVarianceBidPriceTopPercent * outBuyoutPrice);
             }
             else
                 outBidPrice = outBuyoutPrice;
@@ -357,6 +361,8 @@ void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& 
         classQualityPriceMultiplier = PriceMultiplierCategoryQuality[itemProto->Class][itemProto->Quality];
 
     float advancedPricingMultiplier = GetAdvancedPricingMultiplier(itemProto);
+    if (referenceQuote && !std::isfinite(advancedPricingMultiplier))
+        advancedPricingMultiplier = 1;
 
     // Grab the minimum prices
     uint64 PriceMinimumCenterBase = 1000;
@@ -388,9 +394,9 @@ void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& 
 
     // Set the minimum price
     if (outBuyoutPrice < PriceMinimumCenterBase)
-        outBuyoutPrice = urand(PriceMinimumCenterBase * (1.0f - BuyoutVariationReducePercent), PriceMinimumCenterBase * (1.0f + BuyoutVariationAddPercent));
+        outBuyoutPrice = priceRange(PriceMinimumCenterBase * (1.0f - BuyoutVariationReducePercent), PriceMinimumCenterBase * (1.0f + BuyoutVariationAddPercent));
     else
-        outBuyoutPrice = urand(outBuyoutPrice * (1.0f - BuyoutVariationReducePercent), outBuyoutPrice * (1.0f + BuyoutVariationAddPercent));
+        outBuyoutPrice = priceRange(outBuyoutPrice * (1.0f - BuyoutVariationReducePercent), outBuyoutPrice * (1.0f + BuyoutVariationAddPercent));
 
     // Ensure no multipliers are zero or negative
     if (classPriceMultiplier <= 0.0f)
@@ -442,13 +448,18 @@ void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& 
     if (BuyoutBelowVendorVariationAddPercentEnabled == true && outBuyoutPrice < itemProto->SellPrice)
     {
         float minLowPriceAddVariancePercent = 1.0f + BuyoutBelowVendorVariationAddPercent;
-        outBuyoutPrice = urand(itemProto->SellPrice, minLowPriceAddVariancePercent * itemProto->SellPrice);
+        outBuyoutPrice = priceRange(itemProto->SellPrice, minLowPriceAddVariancePercent * itemProto->SellPrice);
     }
+
+    // A lower random roll can enter the vendor uplift branch even when the highest roll did not.
+    // Include that alternative in the stable upper quote as well.
+    if (referenceQuote && BuyoutBelowVendorVariationAddPercentEnabled)
+        outBuyoutPrice = std::max<uint64>(outBuyoutPrice, (1.0f + BuyoutBelowVendorVariationAddPercent) * itemProto->SellPrice);
 
     // Calculate a bid price based on a variance against buyout price
     float sellVarianceBidPriceTopPercent = 1.0f - BidVariationHighReducePercent;
     float sellVarianceBidPriceBottomPercent = 1.0f - BidVariationLowReducePercent;
-    outBidPrice = urand(sellVarianceBidPriceBottomPercent * outBuyoutPrice, sellVarianceBidPriceTopPercent * outBuyoutPrice);
+    outBidPrice = priceRange(sellVarianceBidPriceBottomPercent * outBuyoutPrice, sellVarianceBidPriceTopPercent * outBuyoutPrice);
 
     // Catch any zeros
     if (outBuyoutPrice == 0)
@@ -685,6 +696,91 @@ static const std::unordered_set<uint32> professionSkills = {
     773,  // Inscription
     129   // First Aid
 };
+
+void AuctionHouseBot::PopulateCraftedPricing()
+{
+    auto& model = CraftedPricingModels[-1]; // Source graph; house-specific cuts are built lazily.
+    for (uint32 spellId = 1; spellId < sSpellStore.GetNumRows(); ++spellId)
+    {
+        SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellId);
+        if (!spell)
+            continue;
+        bool profession = false;
+        auto bounds = sSpellMgr->GetSkillLineAbilityMapBounds(spellId);
+        for (auto it = bounds.first; it != bounds.second; ++it)
+            if (professionSkills.count(it->second->SkillLine))
+                profession = true;
+        if (!profession)
+            continue;
+
+        SpellEffectInfo const* create = nullptr;
+        bool supported = true;
+        for (auto const& effect : spell->Effects)
+        {
+            if (effect.Effect == SPELL_EFFECT_CREATE_ITEM)
+            {
+                if (create || !effect.ItemType || effect.RealPointsPerLevel != 0)
+                    supported = false;
+                create = &effect;
+            }
+            // Triggered/random creation and multi-output recipes need their own cost allocation.
+            else if (effect.TriggerSpell || effect.Effect == SPELL_EFFECT_CREATE_RANDOM_ITEM ||
+                effect.Effect == SPELL_EFFECT_CREATE_ITEM_2)
+                supported = false;
+        }
+        if (!supported || !create)
+            continue;
+        ItemTemplate const* output = sObjectMgr->GetItemTemplate(create->ItemType);
+        if (!output)
+            continue;
+        AhBotPricing::Recipe recipe;
+        // Guaranteed ordinary output, excluding optional specialization procs.
+        int64 quantity = int64(create->BasePoints) + (create->DieSides > 0 ? 1 : create->DieSides);
+        recipe.output = std::min<uint64>(std::max<int64>(quantity, 1), output->GetMaxStackSize());
+        for (uint32 slot = 0; slot < MAX_SPELL_REAGENTS; ++slot)
+        {
+            if (spell->Reagent[slot] <= 0 || spell->ReagentCount[slot] <= 0)
+                continue;
+            uint32 id = spell->Reagent[slot];
+            if (!sObjectMgr->GetItemTemplate(id))
+                supported = false;
+            recipe.materials.push_back({id, uint32(spell->ReagentCount[slot])});
+        }
+        if (!supported || recipe.materials.empty())
+            continue;
+        model.items[output->ItemId].recipes.push_back(recipe);
+        for (auto const& material : recipe.materials)
+            model.items.try_emplace(material.item);
+    }
+    for (auto& [id, item] : model.items)
+    {
+        auto proto = sObjectMgr->GetItemTemplate(id);
+        uint64 bid = 0, buyout = 0;
+        CalculateItemValue(proto, bid, buyout, true);
+        item.vendor = proto->SellPrice;
+        item.quote = std::max<uint64>(buyout, proto->SellPrice);
+    }
+    CraftedPricingReady = true;
+}
+
+bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout)
+{
+    if (!CraftedPricingReady)
+        PopulateCraftedPricing();
+    // Match AuctionEntry::GetAuctionCut, including neutral AH and Rate.Auction.Cut.
+    double cut = std::max(0.0, double(house->cutPercent) * sWorld->getRate(RATE_AUCTION_CUT) / 100.0);
+    auto it = CraftedPricingModels.find(cut);
+    if (it == CraftedPricingModels.end())
+    {
+        auto model = CraftedPricingModels.at(-1);
+        model.Build(CraftedPricingMargin, cut);
+        it = CraftedPricingModels.emplace(cut, std::move(model)).first;
+        LOG_INFO("module", "AuctionHouseBot: Built crafting prices with {}% margin and {}% auction cut", CraftedPricingMargin * 100, cut * 100);
+    }
+    if (!it->second.IsValid())
+        return false;
+    return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+}
 
 std::unordered_set<uint32> AuctionHouseBot::GetItemIDsProducedByRecipes()
 {
@@ -1153,6 +1249,19 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
 
             Player* AHBplayer = AHBPlayers[urand(0, AHBPlayers.size() - 1)];
 
+            uint64 buyoutPrice = 0;
+            uint64 bidPrice = 0;
+            // Keep the buyer on legacy valuations; recipe margins only affect new bot listings.
+            if (CraftedPricingEnabled)
+            {
+                CalculateItemValue(prototype, bidPrice, buyoutPrice);
+                if (!ApplyCraftedPricing(prototype, ahEntry, bidPrice, buyoutPrice))
+                {
+                    batchCount++;
+                    continue;
+                }
+            }
+
             Item* item = Item::CreateItem(itemID, 1, AHBplayer);
             if (item == NULL)
             {
@@ -1166,16 +1275,18 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             if (randomPropertyId != 0)
                 item->SetItemRandomProperties(randomPropertyId);
 
-            // Determine price
-            uint64 buyoutPrice = 0;
-            uint64 bidPrice = 0;
-            CalculateItemValue(prototype, bidPrice, buyoutPrice);
+            // Preserve legacy RNG ordering when recipe pricing is disabled.
+            if (!CraftedPricingEnabled)
+                CalculateItemValue(prototype, bidPrice, buyoutPrice);
 
             // Define a duration
             uint32 etime = urand(ListingExpireTimeInSecondsMin, ListingExpireTimeInSecondsMax);
 
             // Set stack size
             uint32 stackCount = GetStackSizeForItem(prototype);
+            // Auction money fields are uint32 totals, even when per-unit pricing uses uint64.
+            if (CraftedPricingEnabled)
+                stackCount = std::min<uint64>(stackCount, UINT32_MAX / std::max<uint64>(1, std::max(buyoutPrice, bidPrice)));
             item->SetCount(stackCount);
 
             uint32 dep =  sAuctionMgr->GetAuctionDeposit(ahEntry, etime, item, stackCount);
@@ -1967,6 +2078,13 @@ bool AuctionHouseBot::IsModuleEnabled()
 
 void AuctionHouseBot::InitializeConfiguration()
 {
+    CraftedPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.CraftedPricing.Enabled", false);
+    CraftedPricingMargin = sConfigMgr->GetOption<float>("AuctionHouseBot.CraftedPricing.ProfitMargin", 0.15f);
+    if (!std::isfinite(CraftedPricingMargin) || CraftedPricingMargin < 0 || CraftedPricingMargin > 10)
+        CraftedPricingMargin = 0.15f;
+    CraftedPricingReady = false;
+    CraftedPricingModels.clear();
+
     debug_Out = sConfigMgr->GetOption<bool>("AuctionHouseBot.DEBUG", false);
     debug_Out_Filters = sConfigMgr->GetOption<bool>("AuctionHouseBot.DEBUG_FILTERS", false);
 

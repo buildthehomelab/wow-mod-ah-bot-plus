@@ -62,3 +62,56 @@ The above behavior is replicated on each enabled auction house.  If left to defa
 - Zeb139: Lots of great enhancements, like enhanced pricing formulas and performance improvements (plus more)
 - Ayase: ported the bot to AzerothCore
 - Other contributors (check the contributors list)
+
+## Recipe-aware crafted prices
+
+Enable `AuctionHouseBot.CraftedPricing.Enabled` to stop newly generated crafted stock
+undercutting its ingredients. `AuctionHouseBot.CraftedPricing.ProfitMargin = 0.15`
+sets a 15% margin over ingredient replacement cost **after the auction cut**. With
+10g of ingredients and a 5% auction cut, the minimum listing is 12g 10s 53c.
+A neutral house or `Rate.Auction.Cut` change uses the corresponding cut automatically.
+Both starting bids and buyouts respect the floor, including complete item overrides.
+The existing valuation can still produce a higher price. Failed-sale deposits are
+not covered, and a profitable asking price does not guarantee that an item sells.
+
+Ingredient replacement costs use a deterministic upper quote from the bot's existing
+configured pricing, including its maximum random markup. This is a stable reference
+consistent with **new** bot listings, not a scan of the cheapest current auction.
+Player listings cannot change it. Crafted ingredients use their own recipe-aware
+reference recursively. For multiple recipes, the cheapest supported recipe wins;
+output counts use the guaranteed ordinary yield capped by the item's stack limit.
+Bonus procs are excluded so margins do not depend on a lucky craft.
+
+Supported recipes have a profession skill association, one ordinary create-item effect,
+known positive reagents and no level-dependent yield or triggered/random creation.
+Cyclic conversion routes are excluded conservatively, while other recipes for the
+same item remain eligible. Recipes with only excluded routes keep legacy pricing.
+Recipe eligibility is catalog-based, not character-specific: profession specialization,
+progression, cooldown availability and learned-recipe requirements are not modeled.
+Prices refer to immediate ingredients and recursively priced intermediates; they do
+not assume buying vendor ingredients at discounted prices. When an ingredient has no
+bot stock, its configured bot valuation remains an estimate, not a promise of availability.
+
+The model is built lazily after spell/item loading and cached by auction cut. `.ahbot
+reload` invalidates it so the next seller cycle rebuilds it from current configuration.
+It never queries or writes auction/character tables for valuation. Items whose floor
+exceeds `AuctionHouseBot.MaxBuyoutPriceInCopper` (or uint32 auction money capacity)
+are skipped, and stack sizes are reduced when required to fit the auction's money fields.
+
+The feature defaults off and preserves the legacy RNG/pricing path when disabled.
+It affects the seller only. The buyer intentionally keeps its legacy willingness to
+pay; seller price increases do not automatically raise buyer payouts. Buyer economics
+and vendor resale arbitrage should be reviewed separately before changing that policy.
+
+Existing auctions retain their recorded prices. Deploy the reviewed module and its
+server manifest pin, enable the feature in the realm's configuration override, then
+plan an explicit refresh of existing bot auctions. `.ahbot empty` removes bot auctions
+and refunds bids; it is an operational action, not part of enabling this setting.
+No database migration or client patch is needed.
+
+Run the isolated economics checks with:
+
+```sh
+c++ -std=c++17 -Wall -Wextra -Werror tests/crafting_pricing_test.cpp -o /tmp/crafting-pricing-test
+/tmp/crafting-pricing-test
+```
