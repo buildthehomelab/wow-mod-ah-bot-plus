@@ -23,11 +23,13 @@
 
 #include "Common.h"
 #include "ObjectGuid.h"
+#include "CraftingPricing.h"
 
 #include <map>
 #include <vector>
 
 struct AuctionEntry;
+struct AuctionHouseEntry;
 class Player;
 class WorldSession;
 
@@ -126,6 +128,12 @@ private:
     bool debug_Out;
     bool debug_Out_Filters;
 
+    bool CraftedPricingEnabled = false;
+    float CraftedPricingMargin = 0.15f;
+    bool CraftedPricingReady = false;
+    std::map<double, AhBotPricing::Model> CraftedPricingModels;
+    void PopulateCraftedPricing();
+    bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;
     bool BuyingBotEnabled;
     bool ReturnExpiredAuctionItemsToBot;
@@ -361,7 +369,7 @@ public:
     const char* GetQualityName(ItemQualities quality);
     const char* GetCategoryName(ItemClass category);
     uint32 GetStackSizeForItem(ItemTemplate const* itemProto) const;
-    void CalculateItemValue(ItemTemplate const* itemProto, uint64& outBidPrice, uint64& outBuyoutPrice);
+    void CalculateItemValue(ItemTemplate const* itemProto, uint64& outBidPrice, uint64& outBuyoutPrice, bool referenceQuote = false);
     void PopulateItemDropChances();
     void PopulateItemDropChancesForCategoryAndQuality(ItemClass category, std::string qualities);
     void InitializeAdvancedListingRuleUseDropRatesTiers();

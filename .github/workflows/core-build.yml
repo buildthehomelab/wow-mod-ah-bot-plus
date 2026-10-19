@@ -1,12 +1,25 @@
-name: core-build
+name: CI
 on:
   push:
-    branches:
-      - 'master'
+    branches: [master]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    uses: azerothcore/reusable-workflows/.github/workflows/core_build_modules.yml@main
-    with:
-      module_repo: ${{ github.event.repository.name }}
+  ci:
+    uses: buildthehomelab/wow-ci/.github/workflows/ci.yml@main
+    permissions:
+      contents: read
+      packages: read
+  crafting-pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check crafting economics
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/crafting_pricing_test.cpp -o /tmp/crafting-pricing-test
+          /tmp/crafting-pricing-test
