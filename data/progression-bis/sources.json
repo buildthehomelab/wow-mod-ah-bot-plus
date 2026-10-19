@@ -1,0 +1,722 @@
+[
+  {
+    "era": "classic",
+    "cls": "shaman",
+    "spec": "restoration",
+    "slug": "restoration-shaman",
+    "page": "https://wowtbc.gg/classic/bis-list/restoration-shaman/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/restoration-shaman/page-data.json",
+    "sha256": "cce01769913107ebbed21e6618b9052f498d1d86ee4b0208954c441b7e38b13e"
+  },
+  {
+    "era": "classic",
+    "cls": "shaman",
+    "spec": "elemental",
+    "slug": "elemental-shaman",
+    "page": "https://wowtbc.gg/classic/bis-list/elemental-shaman/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/elemental-shaman/page-data.json",
+    "sha256": "9aad6383faaf296c7648f6c06cd2b2026af86dc3cf4169713a28507ca373a936"
+  },
+  {
+    "era": "classic",
+    "cls": "shaman",
+    "spec": "enhancement",
+    "slug": "enhancement-shaman",
+    "page": "https://wowtbc.gg/classic/bis-list/enhancement-shaman/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/enhancement-shaman/page-data.json",
+    "sha256": "57991f530d2c66825366d1915c03ab29dca6c9ff20dfbe9a4b584272a21e8b6b"
+  },
+  {
+    "era": "classic",
+    "cls": "druid",
+    "spec": "restoration",
+    "slug": "restoration-druid",
+    "page": "https://wowtbc.gg/classic/bis-list/restoration-druid/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/restoration-druid/page-data.json",
+    "sha256": "28d0699ce1cd9c961a3d3362f421449275c81b495d586b621d727baff238adf2"
+  },
+  {
+    "era": "classic",
+    "cls": "druid",
+    "spec": "balance",
+    "slug": "balance-druid",
+    "page": "https://wowtbc.gg/classic/bis-list/balance-druid/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/balance-druid/page-data.json",
+    "sha256": "eb1c6b2dbdfe3cbb75b9992fdeafc815c6c3c5d4c4f58f73c13dbda7766fbaa5"
+  },
+  {
+    "era": "classic",
+    "cls": "druid",
+    "spec": "feral dps",
+    "slug": "feral-dps-druid",
+    "page": "https://wowtbc.gg/classic/bis-list/feral-dps-druid/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/feral-dps-druid/page-data.json",
+    "sha256": "3faf8308a2bae6e28a922861721e21a8640c147fe851a5def624b48fd3b7a6e2"
+  },
+  {
+    "era": "classic",
+    "cls": "druid",
+    "spec": "feral tank",
+    "slug": "feral-tank-druid",
+    "page": "https://wowtbc.gg/classic/bis-list/feral-tank-druid/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/feral-tank-druid/page-data.json",
+    "sha256": "74fc6e4302bb2e1a3347f3a9fb0d12e7ec2512bf016ad24c31149e2e6ae2e09c"
+  },
+  {
+    "era": "classic",
+    "cls": "warrior",
+    "spec": "fury",
+    "slug": "fury-warrior",
+    "page": "https://wowtbc.gg/classic/bis-list/fury-warrior/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/fury-warrior/page-data.json",
+    "sha256": "95005ed783556e27e46b512051671ca39f10d3cc714caeec74f77d86283e43e6"
+  },
+  {
+    "era": "classic",
+    "cls": "rogue",
+    "spec": "combat",
+    "slug": "combat-rogue",
+    "page": "https://wowtbc.gg/classic/bis-list/combat-rogue/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/combat-rogue/page-data.json",
+    "sha256": "02a47c2eff50a2a95d36f92233af0a8dfcdae16e38b9b517b9bd548526d576b4"
+  },
+  {
+    "era": "classic",
+    "cls": "rogue",
+    "spec": "combat daggers",
+    "slug": "combat-daggers-rogue",
+    "page": "https://wowtbc.gg/classic/bis-list/combat-daggers-rogue/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/combat-daggers-rogue/page-data.json",
+    "sha256": "a4a03dd6cba6fc6ecde8a262ad29d71725a553721c8e52bee869291d345f978f"
+  },
+  {
+    "era": "classic",
+    "cls": "warlock",
+    "spec": "affliction",
+    "slug": "affliction-warlock",
+    "page": "https://wowtbc.gg/classic/bis-list/affliction-warlock/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/affliction-warlock/page-data.json",
+    "sha256": "13b039a64ef3714ca15f0918d31fc5ee5b18eed0d4d27846ae09f6ff388fc4fa"
+  },
+  {
+    "era": "classic",
+    "cls": "warlock",
+    "spec": "destruction",
+    "slug": "destruction-warlock",
+    "page": "https://wowtbc.gg/classic/bis-list/destruction-warlock/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/destruction-warlock/page-data.json",
+    "sha256": "7d9a9dfdee7942f0faaa2b9486318495bf0779d4b827a18dd4977ef0afc9ef45"
+  },
+  {
+    "era": "classic",
+    "cls": "mage",
+    "spec": "arcane",
+    "slug": "arcane-mage",
+    "page": "https://wowtbc.gg/classic/bis-list/arcane-mage/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/arcane-mage/page-data.json",
+    "sha256": "1145c4ed361bec9ee6fa5e3d4b3f327a998007c938a5c250ad4c28bac74c7dd2"
+  },
+  {
+    "era": "classic",
+    "cls": "mage",
+    "spec": "frost",
+    "slug": "frost-mage",
+    "page": "https://wowtbc.gg/classic/bis-list/frost-mage/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/frost-mage/page-data.json",
+    "sha256": "d419beae8fc1a6ebc6cf45b249fe7572b73f7d8a8dbbd9db468efb7b6ffa11e7"
+  },
+  {
+    "era": "classic",
+    "cls": "priest",
+    "spec": "holy",
+    "slug": "holy-priest",
+    "page": "https://wowtbc.gg/classic/bis-list/holy-priest/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/holy-priest/page-data.json",
+    "sha256": "5e19f9b9ebc7a8c9b7f0882300e3e10f6fd18a736371353b000ad94932cefbe3"
+  },
+  {
+    "era": "classic",
+    "cls": "priest",
+    "spec": "shadow",
+    "slug": "shadow-priest",
+    "page": "https://wowtbc.gg/classic/bis-list/shadow-priest/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/shadow-priest/page-data.json",
+    "sha256": "30f3402e6d8d7cddc365aa474a1b4c87c9ee7f0895da6217fe203cd3b3b6378a"
+  },
+  {
+    "era": "classic",
+    "cls": "paladin",
+    "spec": "holy",
+    "slug": "holy-paladin",
+    "page": "https://wowtbc.gg/classic/bis-list/holy-paladin/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/holy-paladin/page-data.json",
+    "sha256": "26b4624edeec1fbb92b7cb822cc42c8f3cbe425aa70e3ec113419e5d2fe61f9b"
+  },
+  {
+    "era": "classic",
+    "cls": "paladin",
+    "spec": "retribution",
+    "slug": "retribution-paladin",
+    "page": "https://wowtbc.gg/classic/bis-list/retribution-paladin/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/retribution-paladin/page-data.json",
+    "sha256": "f3525885a9211672690720a0e0037266d0bfeb22a3c07c6e5f6e3cca5713e70d"
+  },
+  {
+    "era": "classic",
+    "cls": "hunter",
+    "spec": "marksmanship",
+    "slug": "marksmanship-hunter",
+    "page": "https://wowtbc.gg/classic/bis-list/marksmanship-hunter/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/marksmanship-hunter/page-data.json",
+    "sha256": "443dee3cdf58cbb13442f46ba494ad072c7efb5964fde07fc03a4025b0f5590e"
+  },
+  {
+    "era": "tbc",
+    "cls": "shaman",
+    "spec": "restoration",
+    "slug": "restoration-shaman",
+    "page": "https://wowtbc.gg/bis-list/restoration-shaman/",
+    "url": "https://wowtbc.gg/page-data/bis-list/restoration-shaman/page-data.json",
+    "sha256": "53d1d58115e51c398190005069051a52b897e5e6424cb32af18f82a298bbcd95"
+  },
+  {
+    "era": "tbc",
+    "cls": "shaman",
+    "spec": "elemental",
+    "slug": "elemental-shaman",
+    "page": "https://wowtbc.gg/bis-list/elemental-shaman/",
+    "url": "https://wowtbc.gg/page-data/bis-list/elemental-shaman/page-data.json",
+    "sha256": "bcb68f8e4faf20210ba7fead44e117790e90b79d694b90536ca4cd35997961a0"
+  },
+  {
+    "era": "tbc",
+    "cls": "shaman",
+    "spec": "enhancement",
+    "slug": "enhancement-shaman",
+    "page": "https://wowtbc.gg/bis-list/enhancement-shaman/",
+    "url": "https://wowtbc.gg/page-data/bis-list/enhancement-shaman/page-data.json",
+    "sha256": "2b3a426860710758fb390fb6ed08113b89532678d8c215dc537137106d64eca1"
+  },
+  {
+    "era": "tbc",
+    "cls": "druid",
+    "spec": "restoration",
+    "slug": "restoration-druid",
+    "page": "https://wowtbc.gg/bis-list/restoration-druid/",
+    "url": "https://wowtbc.gg/page-data/bis-list/restoration-druid/page-data.json",
+    "sha256": "5539bf3db881b6cc3491193d4fab0a71bc48031725dd543facc37b8b1e5893c1"
+  },
+  {
+    "era": "tbc",
+    "cls": "druid",
+    "spec": "balance",
+    "slug": "balance-druid",
+    "page": "https://wowtbc.gg/bis-list/balance-druid/",
+    "url": "https://wowtbc.gg/page-data/bis-list/balance-druid/page-data.json",
+    "sha256": "5941d7eb944873af9b5a5817e621b94f841576c1fdf5515d7e2205daed9696c4"
+  },
+  {
+    "era": "tbc",
+    "cls": "druid",
+    "spec": "feral dps",
+    "slug": "feral-dps-druid",
+    "page": "https://wowtbc.gg/bis-list/feral-dps-druid/",
+    "url": "https://wowtbc.gg/page-data/bis-list/feral-dps-druid/page-data.json",
+    "sha256": "e1310265349729b7005532d584d1d717b98d1c0404be3b6d6c1fc8b000a9f3ad"
+  },
+  {
+    "era": "tbc",
+    "cls": "druid",
+    "spec": "feral tank",
+    "slug": "feral-tank-druid",
+    "page": "https://wowtbc.gg/bis-list/feral-tank-druid/",
+    "url": "https://wowtbc.gg/page-data/bis-list/feral-tank-druid/page-data.json",
+    "sha256": "be814d0a8602e79f25d9ad18e8d8b2d0b9dc1e2a0798d67a20489cc15bcdc003"
+  },
+  {
+    "era": "tbc",
+    "cls": "warrior",
+    "spec": "arms",
+    "slug": "arms-warrior",
+    "page": "https://wowtbc.gg/bis-list/arms-warrior/",
+    "url": "https://wowtbc.gg/page-data/bis-list/arms-warrior/page-data.json",
+    "sha256": "e51e731c029c9fa7046a5ee768ff447263fe8cf9257ebd820f0656110a83f829"
+  },
+  {
+    "era": "tbc",
+    "cls": "warrior",
+    "spec": "fury",
+    "slug": "fury-warrior",
+    "page": "https://wowtbc.gg/bis-list/fury-warrior/",
+    "url": "https://wowtbc.gg/page-data/bis-list/fury-warrior/page-data.json",
+    "sha256": "9a785a0b89cf2df81ac5ae9af32471ccc48366f7a51ca1625354abb526b3cd76"
+  },
+  {
+    "era": "tbc",
+    "cls": "warrior",
+    "spec": "protection",
+    "slug": "protection-warrior",
+    "page": "https://wowtbc.gg/bis-list/protection-warrior/",
+    "url": "https://wowtbc.gg/page-data/bis-list/protection-warrior/page-data.json",
+    "sha256": "c4be29a69a749122294a873951505e72d86e7a199f401661419c9658e7f3efd7"
+  },
+  {
+    "era": "tbc",
+    "cls": "rogue",
+    "spec": "combat",
+    "slug": "combat-rogue",
+    "page": "https://wowtbc.gg/bis-list/combat-rogue/",
+    "url": "https://wowtbc.gg/page-data/bis-list/combat-rogue/page-data.json",
+    "sha256": "04d8ba7876d4fc93b1f5c12e6bd06223f705ce148a810cbf886a11dc439897c8"
+  },
+  {
+    "era": "tbc",
+    "cls": "rogue",
+    "spec": "subtlety",
+    "slug": "subtlety-rogue",
+    "page": "https://wowtbc.gg/bis-list/subtlety-rogue/",
+    "url": "https://wowtbc.gg/page-data/bis-list/subtlety-rogue/page-data.json",
+    "sha256": "0c9bac6dd48bf91fba4550b340994e174cbd8043dd0a3f64637b49c21fde1bd7"
+  },
+  {
+    "era": "tbc",
+    "cls": "rogue",
+    "spec": "assassination",
+    "slug": "assassination-rogue",
+    "page": "https://wowtbc.gg/bis-list/assassination-rogue/",
+    "url": "https://wowtbc.gg/page-data/bis-list/assassination-rogue/page-data.json",
+    "sha256": "6adfff0066eb31a8ee5fb69877840bb0ed752b4a3cc4a590f455df88befc0938"
+  },
+  {
+    "era": "tbc",
+    "cls": "warlock",
+    "spec": "affliction",
+    "slug": "affliction-warlock",
+    "page": "https://wowtbc.gg/bis-list/affliction-warlock/",
+    "url": "https://wowtbc.gg/page-data/bis-list/affliction-warlock/page-data.json",
+    "sha256": "6edd34f9a0f4ea7e35496d7a20e9fdb5fa6e8ddd9cbb919b804623036a01037b"
+  },
+  {
+    "era": "tbc",
+    "cls": "warlock",
+    "spec": "demonology",
+    "slug": "demonology-warlock",
+    "page": "https://wowtbc.gg/bis-list/demonology-warlock/",
+    "url": "https://wowtbc.gg/page-data/bis-list/demonology-warlock/page-data.json",
+    "sha256": "ac0c8f026847455a5d8239e185d7b77cb185168a682bdc81e76e1013f416ee88"
+  },
+  {
+    "era": "tbc",
+    "cls": "warlock",
+    "spec": "destruction",
+    "slug": "destruction-warlock",
+    "page": "https://wowtbc.gg/bis-list/destruction-warlock/",
+    "url": "https://wowtbc.gg/page-data/bis-list/destruction-warlock/page-data.json",
+    "sha256": "f5eb2d46969d7d15dd3cc35263be4ab9a231d34b977bb1a284e480683918b0e4"
+  },
+  {
+    "era": "tbc",
+    "cls": "warlock",
+    "spec": "destruction fire",
+    "slug": "destruction-fire-warlock",
+    "page": "https://wowtbc.gg/bis-list/destruction-fire-warlock/",
+    "url": "https://wowtbc.gg/page-data/bis-list/destruction-fire-warlock/page-data.json",
+    "sha256": "c5279c563c9bc08185461b87ebb3b0d6372f64ced36bbd4bc85efc25108abe9e"
+  },
+  {
+    "era": "tbc",
+    "cls": "mage",
+    "spec": "fire",
+    "slug": "fire-mage",
+    "page": "https://wowtbc.gg/bis-list/fire-mage/",
+    "url": "https://wowtbc.gg/page-data/bis-list/fire-mage/page-data.json",
+    "sha256": "febd093a8825b34d42707191623fce8396a92db85c59ae8b40d914c9c5136ba6"
+  },
+  {
+    "era": "tbc",
+    "cls": "mage",
+    "spec": "arcane",
+    "slug": "arcane-mage",
+    "page": "https://wowtbc.gg/bis-list/arcane-mage/",
+    "url": "https://wowtbc.gg/page-data/bis-list/arcane-mage/page-data.json",
+    "sha256": "a9b6c8a785552a857d2a37a074d49874a2c11d72b9cafacd56b8b4c4641c51eb"
+  },
+  {
+    "era": "tbc",
+    "cls": "mage",
+    "spec": "frost",
+    "slug": "frost-mage",
+    "page": "https://wowtbc.gg/bis-list/frost-mage/",
+    "url": "https://wowtbc.gg/page-data/bis-list/frost-mage/page-data.json",
+    "sha256": "c9bf7c77d78400cb1c8742556cadda945ee1ccf61609752181cae928911d081b"
+  },
+  {
+    "era": "tbc",
+    "cls": "priest",
+    "spec": "holy",
+    "slug": "holy-priest",
+    "page": "https://wowtbc.gg/bis-list/holy-priest/",
+    "url": "https://wowtbc.gg/page-data/bis-list/holy-priest/page-data.json",
+    "sha256": "48e6ecc22bda2decdd826b26d6438f30300cb73b4d4624e4b6cb66199d7bf810"
+  },
+  {
+    "era": "tbc",
+    "cls": "priest",
+    "spec": "shadow",
+    "slug": "shadow-priest",
+    "page": "https://wowtbc.gg/bis-list/shadow-priest/",
+    "url": "https://wowtbc.gg/page-data/bis-list/shadow-priest/page-data.json",
+    "sha256": "c65bae06612135d9f666c7cf322065ab4be0c7e77713e85098ffe397434b69f1"
+  },
+  {
+    "era": "tbc",
+    "cls": "paladin",
+    "spec": "holy",
+    "slug": "holy-paladin",
+    "page": "https://wowtbc.gg/bis-list/holy-paladin/",
+    "url": "https://wowtbc.gg/page-data/bis-list/holy-paladin/page-data.json",
+    "sha256": "3ecded14c064981cec6a4bf7134ac0961ce626bc383abea101cbeec05092789a"
+  },
+  {
+    "era": "tbc",
+    "cls": "paladin",
+    "spec": "protection",
+    "slug": "protection-paladin",
+    "page": "https://wowtbc.gg/bis-list/protection-paladin/",
+    "url": "https://wowtbc.gg/page-data/bis-list/protection-paladin/page-data.json",
+    "sha256": "8adf46da9a3c40685e6560f827324d37b1c98f6438756ecb7960d3822a850174"
+  },
+  {
+    "era": "tbc",
+    "cls": "paladin",
+    "spec": "retribution",
+    "slug": "retribution-paladin",
+    "page": "https://wowtbc.gg/bis-list/retribution-paladin/",
+    "url": "https://wowtbc.gg/page-data/bis-list/retribution-paladin/page-data.json",
+    "sha256": "b86f6fa67d29484f49d48aca9885b249bd6fff5f03e439a1368ba29b67787b83"
+  },
+  {
+    "era": "tbc",
+    "cls": "hunter",
+    "spec": "beast mastery",
+    "slug": "beast-mastery-hunter",
+    "page": "https://wowtbc.gg/bis-list/beast-mastery-hunter/",
+    "url": "https://wowtbc.gg/page-data/bis-list/beast-mastery-hunter/page-data.json",
+    "sha256": "d140114c71cf9a70e5bd51948e761589f68e5bbf5511f75372f3042d2f8dc91d"
+  },
+  {
+    "era": "tbc",
+    "cls": "hunter",
+    "spec": "marksmanship",
+    "slug": "marksmanship-hunter",
+    "page": "https://wowtbc.gg/bis-list/marksmanship-hunter/",
+    "url": "https://wowtbc.gg/page-data/bis-list/marksmanship-hunter/page-data.json",
+    "sha256": "a5eb24b0270df877f633ee55e70885e83edddaa9219e268206af34db98e82d58"
+  },
+  {
+    "era": "tbc",
+    "cls": "hunter",
+    "spec": "survival",
+    "slug": "survival-hunter",
+    "page": "https://wowtbc.gg/bis-list/survival-hunter/",
+    "url": "https://wowtbc.gg/page-data/bis-list/survival-hunter/page-data.json",
+    "sha256": "05b21fa1ff2cce111ef2756a7da0af87519d3e2fd240cf723ad390df591ec419"
+  },
+  {
+    "era": "wrath",
+    "cls": "death knight",
+    "spec": "blood tank",
+    "slug": "blood-tank-death-knight",
+    "page": "https://wowtbc.gg/wotlk/bis-list/blood-tank-death-knight/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/blood-tank-death-knight/page-data.json",
+    "sha256": "b99960646a4ce40a2f028f1947662b0d55948e26887b3d037ee6bceb0214ae8e"
+  },
+  {
+    "era": "wrath",
+    "cls": "death knight",
+    "spec": "blood dps",
+    "slug": "blood-dps-death-knight",
+    "page": "https://wowtbc.gg/wotlk/bis-list/blood-dps-death-knight/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/blood-dps-death-knight/page-data.json",
+    "sha256": "92fb900ffdcf2f81502ad47803f500db283d2cbc1ca51bdee8196d4f2d851451"
+  },
+  {
+    "era": "wrath",
+    "cls": "death knight",
+    "spec": "frost",
+    "slug": "frost-death-knight",
+    "page": "https://wowtbc.gg/wotlk/bis-list/frost-death-knight/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/frost-death-knight/page-data.json",
+    "sha256": "767f13eb6e8a820d4fffc8cd48b262d1303849f2db9ca2ca63e1e1579801e8ea"
+  },
+  {
+    "era": "wrath",
+    "cls": "death knight",
+    "spec": "unholy",
+    "slug": "unholy-death-knight",
+    "page": "https://wowtbc.gg/wotlk/bis-list/unholy-death-knight/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/unholy-death-knight/page-data.json",
+    "sha256": "0ad1246676d5853c60049e6a0892e394d29b4aacef34bac38fa007a6ce546448"
+  },
+  {
+    "era": "wrath",
+    "cls": "druid",
+    "spec": "balance",
+    "slug": "balance-druid",
+    "page": "https://wowtbc.gg/wotlk/bis-list/balance-druid/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/balance-druid/page-data.json",
+    "sha256": "7932e4dda4cc1d5369f0acc5be4356a89470eb521f470db4bb8645c8d117bfd9"
+  },
+  {
+    "era": "wrath",
+    "cls": "druid",
+    "spec": "feral dps",
+    "slug": "feral-dps-druid",
+    "page": "https://wowtbc.gg/wotlk/bis-list/feral-dps-druid/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/feral-dps-druid/page-data.json",
+    "sha256": "21ce2ad0d1f0ca5fa780eaf4244d4d32b778739860ae66745c2616436367e9c4"
+  },
+  {
+    "era": "wrath",
+    "cls": "druid",
+    "spec": "feral tank",
+    "slug": "feral-tank-druid",
+    "page": "https://wowtbc.gg/wotlk/bis-list/feral-tank-druid/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/feral-tank-druid/page-data.json",
+    "sha256": "0d3a47e54ba54a5644332ede19f58a894720e5567b8f1e0030093f0cec35d615"
+  },
+  {
+    "era": "wrath",
+    "cls": "druid",
+    "spec": "restoration",
+    "slug": "restoration-druid",
+    "page": "https://wowtbc.gg/wotlk/bis-list/restoration-druid/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/restoration-druid/page-data.json",
+    "sha256": "fd025ee8a2fc9f51f0636fc0abc2f1b3a399624be1587a02d83a5b7322cbd2c2"
+  },
+  {
+    "era": "wrath",
+    "cls": "hunter",
+    "spec": "beast mastery",
+    "slug": "beast-mastery-hunter",
+    "page": "https://wowtbc.gg/wotlk/bis-list/beast-mastery-hunter/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/beast-mastery-hunter/page-data.json",
+    "sha256": "789bf531f08ade562e79344c05183409960fb12617e9eeac9f43a96e55e573cc"
+  },
+  {
+    "era": "wrath",
+    "cls": "hunter",
+    "spec": "marksmanship",
+    "slug": "marksmanship-hunter",
+    "page": "https://wowtbc.gg/wotlk/bis-list/marksmanship-hunter/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/marksmanship-hunter/page-data.json",
+    "sha256": "02b33ea0e1e363bb178b66c20f5b28684f78232d410389688c37104f98fbae6a"
+  },
+  {
+    "era": "wrath",
+    "cls": "hunter",
+    "spec": "survival",
+    "slug": "survival-hunter",
+    "page": "https://wowtbc.gg/wotlk/bis-list/survival-hunter/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/survival-hunter/page-data.json",
+    "sha256": "286fa768779f11f146ba3099269a9510a587fbc13f079b161af1936bbf6aa7d5"
+  },
+  {
+    "era": "wrath",
+    "cls": "mage",
+    "spec": "arcane",
+    "slug": "arcane-mage",
+    "page": "https://wowtbc.gg/wotlk/bis-list/arcane-mage/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/arcane-mage/page-data.json",
+    "sha256": "320f9aa6aaaa621625f4457be9467769da9305ce8a18af50f8cbc32d68a8b8b5"
+  },
+  {
+    "era": "wrath",
+    "cls": "mage",
+    "spec": "fire",
+    "slug": "fire-mage",
+    "page": "https://wowtbc.gg/wotlk/bis-list/fire-mage/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/fire-mage/page-data.json",
+    "sha256": "0c63b34baa9c1503e6d53db01e86ae1a63c4f331ab38439afe9c9148eca96b64"
+  },
+  {
+    "era": "wrath",
+    "cls": "mage",
+    "spec": "fire ffb",
+    "slug": "fire-ffb-mage",
+    "page": "https://wowtbc.gg/wotlk/bis-list/fire-ffb-mage/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/fire-ffb-mage/page-data.json",
+    "sha256": "e3363dffcc46a233fbc29322cf24fd0170c4be08ed52e4033500967e12d08537"
+  },
+  {
+    "era": "wrath",
+    "cls": "mage",
+    "spec": "frost",
+    "slug": "frost-mage",
+    "page": "https://wowtbc.gg/wotlk/bis-list/frost-mage/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/frost-mage/page-data.json",
+    "sha256": "42398a3cd6871e32c540f7ae39adcf3a5547e82589e86f636606664eae2671cb"
+  },
+  {
+    "era": "wrath",
+    "cls": "paladin",
+    "spec": "holy",
+    "slug": "holy-paladin",
+    "page": "https://wowtbc.gg/wotlk/bis-list/holy-paladin/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/holy-paladin/page-data.json",
+    "sha256": "0268aab68104316cad14ea84236bc5e557ba31f166c0edccd778c5514c82aefe"
+  },
+  {
+    "era": "wrath",
+    "cls": "paladin",
+    "spec": "protection",
+    "slug": "protection-paladin",
+    "page": "https://wowtbc.gg/wotlk/bis-list/protection-paladin/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/protection-paladin/page-data.json",
+    "sha256": "86e3901565168d2a8328b9e9d01a51fca92774f012690427e15e102fc204ac04"
+  },
+  {
+    "era": "wrath",
+    "cls": "paladin",
+    "spec": "retribution",
+    "slug": "retribution-paladin",
+    "page": "https://wowtbc.gg/wotlk/bis-list/retribution-paladin/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/retribution-paladin/page-data.json",
+    "sha256": "2d1cdbe4b3ebad7375cef3a6fd630abd0299af47ae3af8b5176b25293e040e9c"
+  },
+  {
+    "era": "wrath",
+    "cls": "priest",
+    "spec": "discipline",
+    "slug": "discipline-priest",
+    "page": "https://wowtbc.gg/wotlk/bis-list/discipline-priest/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/discipline-priest/page-data.json",
+    "sha256": "bc5ee2f9f409517b7580057a4064e1306932b9ee33652ea54dc90e87eac8019a"
+  },
+  {
+    "era": "wrath",
+    "cls": "priest",
+    "spec": "holy",
+    "slug": "holy-priest",
+    "page": "https://wowtbc.gg/wotlk/bis-list/holy-priest/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/holy-priest/page-data.json",
+    "sha256": "79a55dfa2b5e38c07daf9e0b58af244c9adab68b2b434f41b220158e76d86331"
+  },
+  {
+    "era": "wrath",
+    "cls": "priest",
+    "spec": "shadow",
+    "slug": "shadow-priest",
+    "page": "https://wowtbc.gg/wotlk/bis-list/shadow-priest/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/shadow-priest/page-data.json",
+    "sha256": "ae09064f754509ebbedfef86f27091c5f862c1cc65e102e48edf974899035156"
+  },
+  {
+    "era": "wrath",
+    "cls": "rogue",
+    "spec": "assassination",
+    "slug": "assassination-rogue",
+    "page": "https://wowtbc.gg/wotlk/bis-list/assassination-rogue/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/assassination-rogue/page-data.json",
+    "sha256": "63985fcfdb9a98800d7a44c5c139e8d32ed1a368d42b47ec8a506a8303ba7964"
+  },
+  {
+    "era": "wrath",
+    "cls": "rogue",
+    "spec": "combat",
+    "slug": "combat-rogue",
+    "page": "https://wowtbc.gg/wotlk/bis-list/combat-rogue/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/combat-rogue/page-data.json",
+    "sha256": "6171e3b1857d8422fc214742ee76e78164b2a877b6fe914ba532dedbffe59d66"
+  },
+  {
+    "era": "wrath",
+    "cls": "shaman",
+    "spec": "elemental",
+    "slug": "elemental-shaman",
+    "page": "https://wowtbc.gg/wotlk/bis-list/elemental-shaman/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/elemental-shaman/page-data.json",
+    "sha256": "e9377839586057d35ce6676d2b050db58175c4792fabb60d0eee1d13b153949d"
+  },
+  {
+    "era": "wrath",
+    "cls": "shaman",
+    "spec": "enhancement",
+    "slug": "enhancement-shaman",
+    "page": "https://wowtbc.gg/wotlk/bis-list/enhancement-shaman/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/enhancement-shaman/page-data.json",
+    "sha256": "0400d442356d8d9d729833d99ee2b25e74634b47703607951370feb357d2177d"
+  },
+  {
+    "era": "wrath",
+    "cls": "shaman",
+    "spec": "restoration",
+    "slug": "restoration-shaman",
+    "page": "https://wowtbc.gg/wotlk/bis-list/restoration-shaman/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/restoration-shaman/page-data.json",
+    "sha256": "46902c4070572293a7cf1ad173d5733adfcea4b70e9ef065de8310cdfcc6136e"
+  },
+  {
+    "era": "wrath",
+    "cls": "warlock",
+    "spec": "affliction",
+    "slug": "affliction-warlock",
+    "page": "https://wowtbc.gg/wotlk/bis-list/affliction-warlock/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/affliction-warlock/page-data.json",
+    "sha256": "a2062c36c01ce2eabb7769a72e2f8b6a0db7869d65adede1849af04c1c66c626"
+  },
+  {
+    "era": "wrath",
+    "cls": "warlock",
+    "spec": "demonology",
+    "slug": "demonology-warlock",
+    "page": "https://wowtbc.gg/wotlk/bis-list/demonology-warlock/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/demonology-warlock/page-data.json",
+    "sha256": "fc0381a9002970069d306fd77e1664dedbf1142e33fe8bfd6ba3055c1677b197"
+  },
+  {
+    "era": "wrath",
+    "cls": "warlock",
+    "spec": "destruction",
+    "slug": "destruction-warlock",
+    "page": "https://wowtbc.gg/wotlk/bis-list/destruction-warlock/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/destruction-warlock/page-data.json",
+    "sha256": "b0015d15d487b0a7dbde8759158c0d097b15f7cc3622e84b8843a25f0a73078a"
+  },
+  {
+    "era": "wrath",
+    "cls": "warrior",
+    "spec": "arms",
+    "slug": "arms-warrior",
+    "page": "https://wowtbc.gg/wotlk/bis-list/arms-warrior/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/arms-warrior/page-data.json",
+    "sha256": "3868dc18a6a1e8b30dc86eaf9df2eb86d8d484693fe70d957c72a1dc64ef8ad5"
+  },
+  {
+    "era": "wrath",
+    "cls": "warrior",
+    "spec": "fury",
+    "slug": "fury-warrior",
+    "page": "https://wowtbc.gg/wotlk/bis-list/fury-warrior/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/fury-warrior/page-data.json",
+    "sha256": "9754b66d8d70580c09ad42c0885c50b02a508bae68bc80e14218e5effe3edf9b"
+  },
+  {
+    "era": "wrath",
+    "cls": "warrior",
+    "spec": "protection",
+    "slug": "protection-warrior",
+    "page": "https://wowtbc.gg/wotlk/bis-list/protection-warrior/",
+    "url": "https://wowtbc.gg/page-data/wotlk/bis-list/protection-warrior/page-data.json",
+    "sha256": "e6fbe3ac93fda6deded44b3919846289876579f66f7410ee543de14f4861b972"
+  },
+  {
+    "era": "classic",
+    "cls": "warrior",
+    "spec": "fury protection",
+    "slug": "fury-protection-warrior",
+    "page": "https://wowtbc.gg/classic/bis-list/fury-protection-warrior/",
+    "url": "https://wowtbc.gg/page-data/classic/bis-list/fury-protection-warrior/page-data.json",
+    "sha256": "c26e9de3d97af2697ff4d2153f3ccf650d8a98511d6fc1434b906c1189a4793e"
+  }
+]

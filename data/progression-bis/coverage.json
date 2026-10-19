@@ -1,0 +1,40 @@
+{
+  "rows": 9013,
+  "distinct_items": 2327,
+  "pages": 80,
+  "unresolved_rows": 0,
+  "unavailable_sources": [
+    {
+      "era": "classic",
+      "cls": "warrior",
+      "spec": "fury two hand",
+      "url": "https://wowtbc.gg/page-data/classic/bis-list/fury-two-hand-warrior/page-data.json"
+    },
+    {
+      "era": "classic",
+      "cls": "warrior",
+      "spec": "protection mitigation",
+      "url": "https://wowtbc.gg/page-data/classic/bis-list/protection-mitigation-warrior/page-data.json"
+    },
+    {
+      "era": "classic",
+      "cls": "paladin",
+      "spec": "protection",
+      "url": "https://wowtbc.gg/page-data/classic/bis-list/protection-paladin/page-data.json"
+    }
+  ],
+  "by_era": {
+    "classic": {
+      "rows": 2412,
+      "items": 484
+    },
+    "tbc": {
+      "rows": 2957,
+      "items": 763
+    },
+    "wrath": {
+      "rows": 3644,
+      "items": 1101
+    }
+  }
+}

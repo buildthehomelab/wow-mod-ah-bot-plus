@@ -20,8 +20,22 @@ struct Item
     double quote = 0;       // Highest ordinary bot unit buyout (before recipe pricing).
     double vendor = 0;      // NPC pays the player this amount.
     std::vector<Recipe> recipes;
+    double demandMultiplier = 1;
 };
 struct Price { double reference = 0; double floor = 0; };
+
+enum class VellumKind { None, Armor, Weapon };
+inline bool VellumFits(VellumKind required, VellumKind candidate, std::uint32_t level,
+    std::uint32_t baseLevel, bool allowLowLevel)
+{
+    return required != VellumKind::None && required == candidate && (allowLowLevel || level >= baseLevel);
+}
+
+inline std::uint32_t GuaranteedOutput(bool scroll, std::int64_t base, std::int64_t dice, std::uint32_t stack)
+{
+    auto quantity = scroll ? 1 : base + (dice > 0 ? 1 : dice);
+    return std::min<std::uint64_t>(std::max<std::int64_t>(quantity, 1), std::max<std::uint32_t>(stack, 1));
+}
 
 class Model
 {
@@ -110,11 +124,12 @@ private:
                 cost += Resolve(material.item).reference * material.count;
             cheapest = std::min(cheapest, cost / recipe.output);
         }
-        Price price{std::max(item.quote, item.vendor), 0};
+        double demand = std::isfinite(item.demandMultiplier) && item.demandMultiplier >= 1 ? item.demandMultiplier : 1;
+        Price price{std::max(item.quote, item.vendor) * demand, 0};
         if (std::isfinite(cheapest))
         {
-            price.floor = std::ceil(std::max(cheapest, item.vendor) * factor);
-            price.reference = std::max(item.quote, price.floor);
+            price.floor = std::ceil(std::max(cheapest, item.vendor) * factor * demand);
+            price.reference = std::max(price.reference, price.floor);
         }
         prices[id] = price;
         return price;

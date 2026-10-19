@@ -82,8 +82,9 @@ reference recursively. For multiple recipes, the cheapest supported recipe wins;
 output counts use the guaranteed ordinary yield capped by the item's stack limit.
 Bonus procs are excluded so margins do not depend on a lucky craft.
 
-Supported recipes have a profession skill association, one ordinary create-item effect,
-known positive reagents and no level-dependent yield or triggered/random creation.
+Supported recipes have a profession skill association, one ordinary create-item effect
+(or a permanent enchant effect producing a vellum scroll), known positive reagents and
+no level-dependent ordinary yield or triggered/random creation.
 Cyclic conversion routes are excluded conservatively, while other recipes for the
 same item remain eligible. Recipes with only excluded routes keep legacy pricing.
 Recipe eligibility is catalog-based, not character-specific: profession specialization,
@@ -114,4 +115,45 @@ Run the isolated economics checks with:
 ```sh
 c++ -std=c++17 -Wall -Wextra -Werror tests/crafting_pricing_test.cpp -o /tmp/crafting-pricing-test
 /tmp/crafting-pricing-test
+```
+
+### Enchanting scrolls
+
+Recipe pricing also recognizes permanent enchant-item effects that produce a scroll.
+Each scroll costs its full enchant reagents **plus one compatible vellum**. Vellum
+class and minimum level follow the core's enchant casting rules; the cheapest valid
+vellum recipe is used. Reusable rods are not consumed. Scrolls are priced as one
+output, regardless of enchant bonus points. This closes the ordinary create-item
+scan's omission of enchanting scrolls. It does not independently raise raw material
+prices or change buyer payouts.
+
+## Progression BiS demand
+
+`AuctionHouseBot.ProgressionPricing.Enabled = true` applies a configurable premium
+to items in the [published phase-BiS catalog](data/progression-bis/README.md).
+`AuctionHouseBot.ProgressionPricing.BisMultiplier = 1.5` means a 50% premium and is
+an initial tuning choice, not a measured market equilibrium. The premium applies
+to crafted and noncrafted items, to bids and buyouts, after ordinary random pricing
+and item overrides. Crafted floors and intermediate references include each item's
+own premium once. Recommending an item for multiple specs/phases never stacks it.
+
+Individual Progression is per character while auctions are shared, so the catalog
+uses the **union of all phases** rather than a realm-wide current phase or the buyer's
+personal progress. The stored phase/state tags make the lists auditable; they do not
+change progression gates. This is published Classic/TBC/Wrath guidance, as requested,
+not a simulation of Evermore's custom talents/itemization. Source omissions and identity
+normalization are documented alongside the catalog. Only the existing seller candidate
+rules determine whether an item can be listed; including a BoP item in the reference
+list does not enable it on the AH. Buyer valuations remain unchanged.
+
+Both features can be enabled independently, reload their caches with `.ahbot reload`,
+and leave recorded auctions unchanged until an explicit refresh. Over-cap prices are
+skipped and stacks remain within uint32 auction totals. New code still requires a
+reviewed server pin, rebuild and restart before a live refresh. No schema/client changes.
+
+To check the generated runtime membership against the source catalog:
+
+```sh
+python3 tools/build_bis_header.py --check
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```

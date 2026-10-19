@@ -1,4 +1,5 @@
 #include "../src/CraftingPricing.h"
+#include "../src/ProgressionBis.h"
 #include <cassert>
 #include <iostream>
 
@@ -43,5 +44,34 @@ int main()
     vendor.items[2] = {1, 1000, {{1, {{1, 1}}}}};
     vendor.Build(.15, .05);
     assert(vendor.Get(2).floor == 1211); // Finished item's own vendor value stays protected
+    // Enchant effects yield one scroll; bonus points do not reduce its ingredient cost.
+    assert(GuaranteedOutput(true, 50, 1, 20) == 1);
+    assert(GuaranteedOutput(false, 4, 1, 20) == 5);
+    assert(GuaranteedOutput(false, 99, 1, 20) == 20);
+    assert(GuaranteedOutput(false, -3, 0, 20) == 1);
+    assert(!VellumFits(VellumKind::Armor, VellumKind::Weapon, 65, 35, false));
+    assert(!VellumFits(VellumKind::Weapon, VellumKind::Weapon, 40, 60, false));
+    assert(VellumFits(VellumKind::Weapon, VellumKind::Weapon, 65, 60, false));
+    assert(VellumFits(VellumKind::Armor, VellumKind::Armor, 1, 60, true));
+    Model bis;
+    bis.items[1] = {100, 1, {}, 1.5}; // Noncrafted phase BiS: premium once.
+    bis.items[2] = {10, 1, {{1, {{1, 2}}}}, 1.5}; // Crafted phase BiS.
+    bis.items[3] = {10, 1, {{1, {{2, 1}}}}};
+    bis.items[4] = {25, 0, {}}; // Vellum.
+    bis.items[5] = {1, 0, {{1, {{1, 2}, {4, 1}}}}}; // Scroll includes vellum.
+    bis.Build(0, 0);
+    assert(bis.Get(1).reference == 150 && bis.Get(1).floor == 0);
+    assert(bis.Get(2).floor == 450 && bis.Get(2).reference == 450);
+    assert(bis.Get(3).floor == 450); // No second application of intermediate premium.
+    assert(bis.Get(5).floor == 325); // Full reagent + vellum price, not 1/50 of it.
+    // Independent toggles: removing crafting recipes retains raw demand, removing demand restores legacy reference.
+    bis.items[2].recipes.clear(); bis.Build(0, 0);
+    assert(bis.Get(2).floor == 0 && bis.Get(2).reference == 15);
+    bis.items[2].demandMultiplier = 1; bis.Build(0, 0);
+    assert(bis.Get(2).reference == 10);
+    assert(IsProgressionBis(12640)); // Published Lionheart Helm.
+    assert(!IsProgressionBis(0) && !IsProgressionBis(UINT32_MAX));
+    for (std::size_t i = 1; i < ProgressionBis.size(); ++i)
+        assert(ProgressionBis[i-1].item < ProgressionBis[i].item);
     std::cout << "crafting pricing tests passed\n";
 }
