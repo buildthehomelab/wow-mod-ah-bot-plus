@@ -21,6 +21,7 @@
 #include "ObjectMgr.h"
 #include "AuctionHouseMgr.h"
 #include "AuctionHouseBot.h"
+#include "ProgressionBis.h"
 #include "AuctionHouseSearcher.h"
 #include "Config.h"
 #include "Player.h"
@@ -700,16 +701,25 @@ static const std::unordered_set<uint32> professionSkills = {
 void AuctionHouseBot::PopulateCraftedPricing()
 {
     auto& model = CraftedPricingModels[-1]; // Source graph; house-specific cuts are built lazily.
+    std::vector<ItemTemplate const*> vellums;
+    for (auto const& [id, item] : *sObjectMgr->GetItemTemplateStore())
+        if (item.IsArmorVellum() || item.IsWeaponVellum())
+            vellums.push_back(&item);
     for (uint32 spellId = 1; spellId < sSpellStore.GetNumRows(); ++spellId)
     {
         SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellId);
         if (!spell)
             continue;
         bool profession = false;
+        bool enchanting = false;
         auto bounds = sSpellMgr->GetSkillLineAbilityMapBounds(spellId);
         for (auto it = bounds.first; it != bounds.second; ++it)
+        {
             if (professionSkills.count(it->second->SkillLine))
                 profession = true;
+            if (it->second->SkillLine == SKILL_ENCHANTING)
+                enchanting = true;
+        }
         if (!profession)
             continue;
 
@@ -717,9 +727,10 @@ void AuctionHouseBot::PopulateCraftedPricing()
         bool supported = true;
         for (auto const& effect : spell->Effects)
         {
-            if (effect.Effect == SPELL_EFFECT_CREATE_ITEM)
+            bool scroll = enchanting && effect.Effect == SPELL_EFFECT_ENCHANT_ITEM && effect.ItemType;
+            if (effect.Effect == SPELL_EFFECT_CREATE_ITEM || scroll)
             {
-                if (create || !effect.ItemType || effect.RealPointsPerLevel != 0)
+                if (create || !effect.ItemType || (!scroll && effect.RealPointsPerLevel != 0))
                     supported = false;
                 create = &effect;
             }
@@ -735,8 +746,9 @@ void AuctionHouseBot::PopulateCraftedPricing()
             continue;
         AhBotPricing::Recipe recipe;
         // Guaranteed ordinary output, excluding optional specialization procs.
-        int64 quantity = int64(create->BasePoints) + (create->DieSides > 0 ? 1 : create->DieSides);
-        recipe.output = std::min<uint64>(std::max<int64>(quantity, 1), output->GetMaxStackSize());
+        bool scroll = create->Effect == SPELL_EFFECT_ENCHANT_ITEM;
+        // An enchant effect's points are the enchant bonus, not a scroll batch count.
+        recipe.output = AhBotPricing::GuaranteedOutput(scroll, create->BasePoints, create->DieSides, output->GetMaxStackSize());
         for (uint32 slot = 0; slot < MAX_SPELL_REAGENTS; ++slot)
         {
             if (spell->Reagent[slot] <= 0 || spell->ReagentCount[slot] <= 0)
@@ -748,10 +760,41 @@ void AuctionHouseBot::PopulateCraftedPricing()
         }
         if (!supported || recipe.materials.empty())
             continue;
-        model.items[output->ItemId].recipes.push_back(recipe);
+        if (scroll)
+        {
+            // Match the core's vellum item class and BaseLevel restriction. Rods/totems
+            // are reusable and are deliberately not included as consumable reagents.
+            bool scrollSpellMatches = false;
+            for (auto const& itemSpell : output->Spells)
+                if (itemSpell.SpellId == int32(spell->Id))
+                    scrollSpellMatches = true;
+            if (!scrollSpellMatches)
+                continue;
+            auto required = spell->EquippedItemClass == ITEM_CLASS_ARMOR ? AhBotPricing::VellumKind::Armor :
+                spell->EquippedItemClass == ITEM_CLASS_WEAPON ? AhBotPricing::VellumKind::Weapon : AhBotPricing::VellumKind::None;
+            for (auto const* vellum : vellums)
+            {
+                auto kind = vellum->IsArmorVellum() ? AhBotPricing::VellumKind::Armor : AhBotPricing::VellumKind::Weapon;
+                uint32 level = vellum->RequiredLevel ? vellum->RequiredLevel : vellum->ItemLevel;
+                if (!AhBotPricing::VellumFits(required, kind, level, spell->BaseLevel,
+                    spell->HasAttribute(SPELL_ATTR2_ALLOW_LOW_LEVEL_BUFF)))
+                    continue;
+                uint32 id = vellum->ItemId;
+                auto scrollRecipe = recipe;
+                scrollRecipe.materials.push_back({id, 1});
+                model.items[output->ItemId].recipes.push_back(std::move(scrollRecipe));
+                model.items.try_emplace(id);
+            }
+        }
+        else
+            model.items[output->ItemId].recipes.push_back(recipe);
         for (auto const& material : recipe.materials)
             model.items.try_emplace(material.item);
     }
+    if (ProgressionPricingEnabled)
+        for (auto const& entry : AhBotPricing::ProgressionBis)
+            if (sObjectMgr->GetItemTemplate(entry.item))
+                model.items.try_emplace(entry.item);
     for (auto& [id, item] : model.items)
     {
         auto proto = sObjectMgr->GetItemTemplate(id);
@@ -759,6 +802,10 @@ void AuctionHouseBot::PopulateCraftedPricing()
         CalculateItemValue(proto, bid, buyout, true);
         item.vendor = proto->SellPrice;
         item.quote = std::max<uint64>(buyout, proto->SellPrice);
+        if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(id))
+            item.demandMultiplier = ProgressionBisMultiplier;
+        if (!CraftedPricingEnabled)
+            item.recipes.clear();
     }
     CraftedPricingReady = true;
 }
@@ -779,6 +826,14 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
     }
     if (!it->second.IsValid())
         return false;
+    if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(proto->ItemId))
+    {
+        double cap = std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX);
+        if (buyout * double(ProgressionBisMultiplier) > cap || bid * double(ProgressionBisMultiplier) > cap)
+            return false;
+        buyout = uint64(std::ceil(buyout * double(ProgressionBisMultiplier)));
+        bid = uint64(std::ceil(bid * double(ProgressionBisMultiplier)));
+    }
     return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
 }
 
@@ -1252,7 +1307,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             uint64 buyoutPrice = 0;
             uint64 bidPrice = 0;
             // Keep the buyer on legacy valuations; recipe margins only affect new bot listings.
-            if (CraftedPricingEnabled)
+            if (CraftedPricingEnabled || ProgressionPricingEnabled)
             {
                 CalculateItemValue(prototype, bidPrice, buyoutPrice);
                 if (!ApplyCraftedPricing(prototype, ahEntry, bidPrice, buyoutPrice))
@@ -1276,7 +1331,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 item->SetItemRandomProperties(randomPropertyId);
 
             // Preserve legacy RNG ordering when recipe pricing is disabled.
-            if (!CraftedPricingEnabled)
+            if (!CraftedPricingEnabled && !ProgressionPricingEnabled)
                 CalculateItemValue(prototype, bidPrice, buyoutPrice);
 
             // Define a duration
@@ -1285,7 +1340,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             // Set stack size
             uint32 stackCount = GetStackSizeForItem(prototype);
             // Auction money fields are uint32 totals, even when per-unit pricing uses uint64.
-            if (CraftedPricingEnabled)
+            if (CraftedPricingEnabled || ProgressionPricingEnabled)
                 stackCount = std::min<uint64>(stackCount, UINT32_MAX / std::max<uint64>(1, std::max(buyoutPrice, bidPrice)));
             item->SetCount(stackCount);
 
@@ -2078,6 +2133,10 @@ bool AuctionHouseBot::IsModuleEnabled()
 
 void AuctionHouseBot::InitializeConfiguration()
 {
+    ProgressionPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProgressionPricing.Enabled", false);
+    ProgressionBisMultiplier = sConfigMgr->GetOption<float>("AuctionHouseBot.ProgressionPricing.BisMultiplier", 1.5f);
+    if (!std::isfinite(ProgressionBisMultiplier) || ProgressionBisMultiplier < 1 || ProgressionBisMultiplier > 10)
+        ProgressionBisMultiplier = 1.5f;
     CraftedPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.CraftedPricing.Enabled", false);
     CraftedPricingMargin = sConfigMgr->GetOption<float>("AuctionHouseBot.CraftedPricing.ProfitMargin", 0.15f);
     if (!std::isfinite(CraftedPricingMargin) || CraftedPricingMargin < 0 || CraftedPricingMargin > 10)

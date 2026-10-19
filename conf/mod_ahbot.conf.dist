@@ -1083,3 +1083,12 @@ AuctionHouseBot.CraftedPricing.Enabled = false
 # Fraction of ingredient cost retained as crafting profit after the AH cut; 0.15 = 15%.
 # Valid range 0..10. Invalid/nonfinite values fall back to 0.15.
 AuctionHouseBot.CraftedPricing.ProfitMargin = 0.15
+
+# Shared-AH demand premium for the reviewed published Classic/TBC/Wrath phase-BiS
+# catalog in data/progression-bis/. Applied once, regardless of the number of specs
+# or phases that recommend an item. Phases coexist under Individual Progression;
+# this does not gate item access or choose a realm-wide current phase.
+# Seller only; does not change buyer payouts or listing eligibility.
+AuctionHouseBot.ProgressionPricing.Enabled = false
+# 1.5 = 50% premium. Valid range 1..10; invalid values fall back to 1.5.
+AuctionHouseBot.ProgressionPricing.BisMultiplier = 1.5
