@@ -24,6 +24,8 @@
 #include "Common.h"
 #include "ObjectGuid.h"
 #include "CraftingPricing.h"
+#include "BagPricing.h"
+#include <tuple>
 #include "MaterialStock.h"
 #include "AuctionHouseBotPriceCatalog.h"
 
@@ -145,6 +147,7 @@ private:
     float CraftedPricingMargin = 0.15f;
     bool CraftedPricingReady = false;
     std::map<double, AhBotPricing::Model> CraftedPricingModels;
+    std::map<std::tuple<uint32, uint32, uint32>, double> VendorBagPurchasePrices;
     void PopulateCraftedPricing();
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;

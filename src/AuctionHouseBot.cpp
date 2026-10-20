@@ -710,6 +710,26 @@ static const std::unordered_set<uint32> professionSkills = {
 void AuctionHouseBot::PopulateCraftedPricing()
 {
     auto& model = CraftedPricingModels[-1]; // Source graph; house-specific cuts are built lazily.
+    VendorBagPurchasePrices.clear();
+    // Only actual gold vendor offers count. Template BuyPrice without an offer,
+    // or token/currency purchases, is not a usable gold alternative.
+    QueryResult bagVendors = WorldDatabase.Query(
+        "SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0");
+    if (bagVendors)
+    {
+        do
+        {
+            auto bag = sObjectMgr->GetItemTemplate(bagVendors->Fetch()[0].Get<uint32>());
+            if (!bag || bag->Class != ITEM_CLASS_CONTAINER || !bag->ContainerSlots || !bag->BuyPrice)
+                continue;
+            auto key = std::make_tuple(bag->ContainerSlots, bag->BagFamily, bag->SubClass);
+            double purchase = double(bag->BuyPrice) / std::max<uint32>(1, bag->BuyCount);
+            auto [it, inserted] = VendorBagPurchasePrices.emplace(key, purchase);
+            if (!inserted)
+                it->second = std::min(it->second, purchase);
+        } while (bagVendors->NextRow());
+    }
+
     std::vector<ItemTemplate const*> vellums;
     for (auto const& [id, item] : *sObjectMgr->GetItemTemplateStore())
         if (item.IsArmorVellum() || item.IsWeaponVellum())
@@ -884,6 +904,17 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
             return false;
         buyout = uint64(std::ceil(buyout * double(ProgressionBisMultiplier)));
         bid = uint64(std::ceil(bid * double(ProgressionBisMultiplier)));
+    }
+    if (CraftedPricingEnabled && proto->Class == ITEM_CLASS_CONTAINER && proto->ContainerSlots)
+    {
+        auto const& source = CraftedPricingModels.at(-1).items;
+        auto recipe = source.find(proto->ItemId);
+        bool crafted = recipe != source.end() && !recipe->second.recipes.empty();
+        auto vendor = VendorBagPurchasePrices.find(
+            std::make_tuple(proto->ContainerSlots, proto->BagFamily, proto->SubClass));
+        double purchase = vendor == VendorBagPurchasePrices.end() ? 0 : vendor->second;
+        return AhBotPricing::ApplyBagPrice(it->second.Get(proto->ItemId), crafted, purchase,
+            proto->SellPrice, cut, std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
     }
     return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
 }
