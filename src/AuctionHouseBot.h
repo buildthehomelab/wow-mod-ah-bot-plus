@@ -24,6 +24,7 @@
 #include "Common.h"
 #include "ObjectGuid.h"
 #include "CraftingPricing.h"
+#include "MaterialStock.h"
 #include "AuctionHouseBotPriceCatalog.h"
 
 #include <map>
@@ -351,12 +352,19 @@ private:
     int ActiveListMultipleItemID;
     int RemainingListMultipleCount;
 
+    bool MaterialStockEnabled = false;
+    uint32 MaterialStockMinUnits = 20;
+    std::vector<uint32> MaterialStockItems;
+    std::unordered_set<uint32> MaterialStockExcludedItems;
+    std::map<uint32, std::size_t> MaterialStockCursors;
+
     AuctionHouseBot();
 
 public:
     uint64 GetSellerQuote(uint32 item, uint32 house);
     bool GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
     void RebuildSellerCatalog();
+    void PopulateMaterialStock();
 
     static AuctionHouseBot* instance()
     {
@@ -380,7 +388,7 @@ public:
     void AddToNumberListSet(std::set<uint32>& workingItemIDSet, uint32 itemID, const char* parentOperationName);
     const char* GetQualityName(ItemQualities quality);
     const char* GetCategoryName(ItemClass category);
-    uint32 GetStackSizeForItem(ItemTemplate const* itemProto) const;
+    uint32 GetStackSizeForItem(ItemTemplate const* itemProto, bool fullStack = false) const;
     void CalculateItemValue(ItemTemplate const* itemProto, uint64& outBidPrice, uint64& outBuyoutPrice, bool referenceQuote = false);
     void PopulateItemDropChances();
     void PopulateItemDropChancesForCategoryAndQuality(ItemClass category, std::string qualities);
