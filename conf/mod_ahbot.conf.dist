@@ -114,7 +114,9 @@ AuctionHouseBot.MaterialStock.ItemTargets =
 # Requires Seller.StablePrices; otherwise warns and counts bot supply only.
 AuctionHouseBot.MaterialStock.RespectPlayerListings = false
 
-# Rare "pricing error": at most one live vendor-value-or-less stack per house.
+# Rare "pricing error": at most one deliberate live error stack per house.
+# Existing OR queued normal vendor-value-or-less supply suppresses new errors;
+# normal reserve listings themselves are not restricted by this event cap.
 # Defaults to exactly the NPC SELL value per unit (VendorPercent=100); configure
 # 1..99 for lower bargains. Zero-vendor-price materials are ineligible. Deliberately
 # bypasses crafted floors only for this listing; shared references remain normal.
