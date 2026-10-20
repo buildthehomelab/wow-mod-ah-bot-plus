@@ -355,7 +355,7 @@ private:
     bool MaterialStockEnabled = false;
     uint32 MaterialStockMinUnits = 20;
     std::vector<uint32> MaterialStockItems;
-    std::unordered_set<uint32> MaterialStockExcludedItems;
+    std::set<uint32> MaterialStockExcludedItems;
     std::map<uint32, std::size_t> MaterialStockCursors;
 
     AuctionHouseBot();
