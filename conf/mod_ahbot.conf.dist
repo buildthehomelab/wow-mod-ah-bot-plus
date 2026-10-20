@@ -1099,3 +1099,13 @@ AuctionHouseBot.ProgressionPricing.BisMultiplier = 1.5
 # Neutral auctions retain their own fee. Existing auctions require an explicit refresh.
 # Seller only; the buyer's willingness to pay and randomness are unchanged.
 AuctionHouseBot.Seller.StablePrices = false
+
+# BiS buyer offers from the authoritative stable seller reference (not player asks).
+# Requires Buyer.Enabled, ProgressionPricing.Enabled and Seller.StablePrices.
+# Only catalogued BiS items use this policy; ordinary items retain legacy buyer RNG.
+# The inclusive gross per-unit offer is floor(reference * MarketPercent / 100).
+# Auction fees/deposits still apply to seller proceeds. Buyer cycles/guards still apply.
+# AcceptablePriceModifier is not applied again to this policy.
+AuctionHouseBot.Buyer.ProgressionPricing.Enabled = false
+# Integer range 1..99; invalid values fall back to 90 (10% below reference).
+AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90

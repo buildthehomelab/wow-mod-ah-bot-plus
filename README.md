@@ -202,3 +202,26 @@ auctioneer. They describe future bot listings, not current availability or guara
 player sale proceeds. Existing auctions keep their persisted prices until refreshed.
 Both modules must be built into the same worldserver; independent dynamic libraries are
 not supported by this inline provider API. Buyer payouts are unchanged.
+
+## BiS buyer pricing
+
+Opt in with `AuctionHouseBot.Buyer.ProgressionPricing.Enabled = true`; set
+`AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90` for an inclusive gross
+per-unit offer of floor(90% of the bot's stable seller reference). Valid integer percentages
+are 1..99; invalid values revert to 90. Stable seller pricing, progression pricing and an
+active buyer are required. Targeted BiS items without a valid seller reference fail closed;
+non-BiS items and disabled policy keep the legacy buyer calculation. Player asking prices
+cannot raise the reference. AcceptablePriceModifier is not multiplied into this new offer.
+
+The actual buying path and optional shared `BuyerOffer` API use the same method. Vendor
+and zero-vendor-price guards apply, and targeted vendor caps are per unit for stacks. Bid
+totals remain within uint32 auction money limits. Exact-threshold buyouts are accepted; one
+copper above the stack offer is not. The reference still includes crafting floors and BiS
+demand. A 15% crafting floor and 90% offer leave about 3.5% after the matching auction cut
+before deposits and copper rounding, with more where a demand premium dominates. This is
+not a guarantee for every recipe, live material availability or arbitrary player material asks.
+
+Buying still follows configured buyer cycles/candidate limits and normal mail delivery. It
+is not an instant-sale endpoint. Existing lower-priced bot stock should be refreshed during
+coordinated deployment. Ship the matched RetailAH and RetailProfessions updates so displayed
+offers and BiS craft profits agree with actual buying behavior. No SQL/client patch is needed.
