@@ -40,6 +40,20 @@ inline bool Affordable(std::uint64_t buyout, std::uint32_t count, std::uint64_t 
     return unit < reference || (unit == reference && buyout % count == 0);
 }
 
+// Observe both live auctions and queued normal refills before planning specials.
+// Vendor-value normal supply suppresses a new deliberate pricing-error event.
+struct SpecialSupply
+{
+    bool vendorValueSupply = false;
+    std::uint32_t largeListings = 0;
+    void Observe(std::uint64_t buyout, std::uint32_t count, std::uint32_t vendor)
+    {
+        vendorValueSupply = vendorValueSupply || Affordable(buyout, count, vendor);
+        if (count > 20)
+            largeListings = std::min(2u, largeListings + 1);
+    }
+};
+
 // Exceptional large stacks bypass only the normal listing cap, never the loaded
 // template or uint32 auction money limits. Reject an event that cannot exceed 20.
 inline std::uint32_t ListingUnits(Kind kind, std::uint32_t requested,
