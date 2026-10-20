@@ -316,7 +316,8 @@ remain deployment steps; inspect logs and live faction stock after deployment.
 buyout listings and the same affordable-player-supply rules as replenishment.
 Refill-needed counts include new shortages and unfinished batches; they describe
 remaining demand, not a promise to list everything in the next cycle. Seller cap
-zero disables selling in that house; it does not disable buying.
+zero disables selling in that house. Legacy buying can continue, but targeted BiS
+buying fails closed because its reference quote requires a positive seller cap.
 
 Buyer counters accumulate in memory since process start, including across config
 reloads. Scan exclusions can count the same player auction on multiple cycles.
