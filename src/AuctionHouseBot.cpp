@@ -1386,7 +1386,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             bots.insert(bot.CharacterGUID);
         std::map<uint32, uint32> botSupply, playerSupply;
         std::set<uint32> playerItems;
-        uint32 activePricingErrors = 0, activeLargeStacks = 0;
+        AhBotStock::SpecialSupply specialSupply;
         auto now = time(nullptr);
         for (auto const& [id, auction] : auctionHouse->GetAuctions())
         {
@@ -1401,10 +1401,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 auto proto = sObjectMgr->GetItemTemplate(auction->item_template);
                 // Recognize live special supply after restart without a new persistence table.
                 // Conservatively treat legacy vendor-price/large listings as specials too.
-                if (proto && AhBotStock::Affordable(auction->buyout, auction->itemCount, proto->SellPrice))
-                    ++activePricingErrors;
-                if (auction->itemCount > 20)
-                    ++activeLargeStacks;
+                specialSupply.Observe(auction->buyout, auction->itemCount, proto ? proto->SellPrice : 0);
             }
             else
             {
@@ -1468,14 +1465,24 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 --wanted;
             }
         };
+        // The live snapshot does not yet contain this pass's normal refills. Their
+        // exact stable quote may already be vendor-value (e.g. a configured override),
+        // so let that queued bargain suppress a second deliberate pricing error.
+        if (StableSellerPrices && PricingErrorsEnabled)
+            for (auto const& request : stockRequests)
+            {
+                auto proto = sObjectMgr->GetItemTemplate(request.item);
+                if (proto)
+                    specialSupply.Observe(GetSellerQuote(request.item, config->GetAHID()), 1, proto->SellPrice);
+            }
         // Both events are opt-in and use their own per-house cooldowns; ordinary deficits
         // always get the cycle budget first. No auction/player prices feed back into quotes.
-        if (StableSellerPrices && PricingErrorsEnabled && !activePricingErrors
+        if (StableSellerPrices && PricingErrorsEnabled && !specialSupply.vendorValueSupply
             && now >= nextError && urand(1, 100) <= PricingErrorsChance)
             addSpecial(AhBotStock::Kind::PricingError, 1);
-        if (StableSellerPrices && LargeStacksEnabled && activeLargeStacks < 2
+        if (StableSellerPrices && LargeStacksEnabled && specialSupply.largeListings < 2
             && now >= nextLarge && urand(1, 100) <= LargeStacksChance)
-            addSpecial(AhBotStock::Kind::LargeStack, std::min(2u - activeLargeStacks, urand(1, 2)));
+            addSpecial(AhBotStock::Kind::LargeStack, std::min(2u - specialSupply.largeListings, urand(1, 2)));
     }
     uint32 currentAuctionItemListCount = auctionHouse->Getcount();
     uint32 randomBudget = currentAuctionItemListCount < minItems && currentAuctionItemListCount < maxItems
