@@ -79,20 +79,69 @@ AuctionHouseBot.ReturnExpiredAuctionItemsToBot = false
 AuctionHouseBot.GUIDs = 0
 AuctionHouseBot.ItemsPerCycle = 150
 
-# Maintain a bot-owned buyout reserve of every tradable consumed profession reagent
-# (including cooking/first aid/enchanting) and vellum in each enabled house.
-# Checked every sell cycle, before random stock, using only unexpired bot buyouts.
-# MinUnits is a quantity, not a listing count; valid range 1..10000 (clamped).
-# Full stacks respect template and ListingStack.MaxStackSize caps. One replenishment
-# listing per deficient material per cycle; ItemsPerCycle still bounds total additions.
-# This reserve may exceed faction MaxItems, which remains the RANDOM stock cap.
-# The dedicated material catalog bypasses random-pool restrictions/DisabledItemIDs;
-# use MaterialStock.ExcludedItemIDs for explicit material exclusions. Bound, missing,
-# temporary and conjured items are always excluded and logged. No player auctions
-# are removed or counted as reserve. Excluded/unpriceable IDs are logged.
+# Material supply: actual consumed profession ingredients and vellum, per enabled
+# house. Bound, conjured, temporary and missing items remain excluded and logged.
+# The dedicated catalog bypasses random-pool exclusions; use ExcludedItemIDs here.
+# Managed materials never enter random filling. Existing listings are not removed.
+# Each low-stock material starts a batch that continues to RefillUnits across cycles.
+# Ordinary reserve listings contain <=20 and respect lower template/config caps.
+# All additions, including specials, share ItemsPerCycle; reserves take priority and
+# can exceed faction MaxItems (the random-stock cap). Quantities clamp to 1..10000.
 AuctionHouseBot.MaterialStock.Enabled = false
 AuctionHouseBot.MaterialStock.MinUnits = 20
+AuctionHouseBot.MaterialStock.RefillUnits = 20
 AuctionHouseBot.MaterialStock.ExcludedItemIDs =
+
+# Opt-in material targets: poor/normal/uncommon ingredients use Common; rare and
+# higher quality use Rare. Quality is a starting proxy, not measured market demand.
+# RecipeAwareTargets raises minimum to the largest consumed amount in a profession
+# recipe, refill to >= twice that amount, capped at 10000. Counts repeated slots.
+# ItemTargets overrides all calculated targets: comma-separated item:min:refill
+# records, no whitespace; 1<=min<=refill<=10000. Invalid records warn; last duplicate
+# wins. Example: 2589:80:200,12363:5:20. Only eligible material IDs are affected.
+AuctionHouseBot.MaterialStock.UseMaterialTargets = false
+AuctionHouseBot.MaterialStock.Common.MinUnits = 40
+AuctionHouseBot.MaterialStock.Common.RefillUnits = 100
+AuctionHouseBot.MaterialStock.Rare.MinUnits = 5
+AuctionHouseBot.MaterialStock.Rare.RefillUnits = 20
+AuctionHouseBot.MaterialStock.RecipeAwareTargets = true
+AuctionHouseBot.MaterialStock.ItemTargets =
+
+# Count unexpired player buyouts priced <= the stable seller unit reference.
+# Combined supply reduces refill deficits. Player supply alone >= minimum cancels
+# active batches, leaving those sales to players. Above-reference/bid-only asks do
+# not suppress supply. No reactive undercutting or player-price quote feedback.
+# Requires Seller.StablePrices; otherwise warns and counts bot supply only.
+AuctionHouseBot.MaterialStock.RespectPlayerListings = false
+
+# Rare "pricing error": at most one live vendor-value-or-less stack per house.
+# Defaults to exactly the NPC SELL value per unit (VendorPercent=100); configure
+# 1..99 for lower bargains. Zero-vendor-price materials are ineligible. Deliberately
+# bypasses crafted floors only for this listing; shared references remain normal.
+# <=20 units, 5% chance each eligible sell cycle after a 60-minute cooldown.
+AuctionHouseBot.MaterialStock.PricingErrors.Enabled = false
+AuctionHouseBot.MaterialStock.PricingErrors.ChancePercent = 5
+AuctionHouseBot.MaterialStock.PricingErrors.CooldownMinutes = 60
+AuctionHouseBot.MaterialStock.PricingErrors.VendorPercent = 100
+
+# Rare bulk arrivals: 1 or 2 listings per event, at most 2 live oversized material
+# listings per house. 21..MaxUnits, normal stable prices/floors. Explicitly bypasses
+# the ordinary AH listing cap of20, never the loaded template/money limits. Needs
+# actual template stacks >20 (e.g. mod-stack-size); otherwise no bulk event occurs.
+AuctionHouseBot.MaterialStock.LargeStacks.Enabled = false
+AuctionHouseBot.MaterialStock.LargeStacks.ChancePercent = 2
+AuctionHouseBot.MaterialStock.LargeStacks.CooldownMinutes = 180
+AuctionHouseBot.MaterialStock.LargeStacks.MaxUnits = 100
+
+# Specials require MaterialStock.Enabled and Seller.StablePrices. Both avoid ANY
+# active player buyout for the chosen item and share the ordinary cycle budget.
+# ChancePercent clamps0..100; cooldowns/lifetime clamp1..1440 minutes. Initial
+# cooldowns apply after restart; reload preserves event cooldowns. Existing bot
+# vendor-value/large listings conservatively count toward active limits after restart.
+# Recognizing old stock can delay specials; no SQL tag or extra persistence needed.
+# Specials can temporarily exceed a material's refill target. No item names/labels
+# are changed: "pricing error" is a log/config concept; players discover the price.
+AuctionHouseBot.MaterialStock.SpecialListings.LifetimeMinutes = 15
 
 AuctionHouseBot.ListingExpireTimeInSecondsMin = 900
 AuctionHouseBot.ListingExpireTimeInSecondsMax = 86400
