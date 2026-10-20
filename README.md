@@ -283,8 +283,10 @@ stack at the NPC **sell** value per unit. `VendorPercent=100` means exactly that
 1..99 permits lower prices, rounded to at least 1 copper. No-vendor-value materials are
 excluded. This deliberate listing-only exception bypasses recipe floors; normal shared
 reference quotes and buyer valuations remain unchanged. The default is a 5% chance per
-eligible sell cycle after a 60-minute per-house cooldown, with at most one live
-vendor-value-or-less bot material listing. Bargain stacks contain at most20 units and
+eligible sell cycle after a 60-minute per-house cooldown, with at most one deliberate live
+pricing-error listing. Any live or queued vendor-value-or-less normal bot supply
+suppresses a new pricing-error event; normal supply itself is not restricted by
+the event cap. Bargain stacks contain at most20 units and
 respect lower configured/template stack limits.
 
 Opt-in `MaterialStock.LargeStacks.Enabled` occasionally creates **one or two** random
