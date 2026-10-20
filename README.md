@@ -187,3 +187,18 @@ refreshed after rebuilding/restarting the reviewed module and applying its serve
 pin/settings. Until that operational refresh is done, the professions addon can still
 show large asking-price margins from old stock. Such margins are estimates, not
 proof that a player or the AH buyer bot will pay that price.
+
+## Shared seller price catalog
+
+`src/AuctionHouseBotPriceCatalog.h` exposes an optional in-process API to other static
+worldserver modules. `Quote(item, house)` returns copper per unit from the exact stable
+seller calculation, including crafted floors and BiS demand. It returns zero when stable
+selling is disabled, the item is excluded from candidate/proportion lists, its house is
+disabled or its price cannot be listed. Quotes are cached by item and house and cleared
+on configuration/candidate reload. No price-table SQL or duplicate pricing formula is used.
+
+RetailAH's additive `KC` request shares these references with addons away from an
+auctioneer. They describe future bot listings, not current availability or guaranteed
+player sale proceeds. Existing auctions keep their persisted prices until refreshed.
+Both modules must be built into the same worldserver; independent dynamic libraries are
+not supported by this inline provider API. Buyer payouts are unchanged.

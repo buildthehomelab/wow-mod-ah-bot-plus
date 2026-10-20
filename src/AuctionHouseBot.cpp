@@ -22,6 +22,7 @@
 #include "AuctionHouseMgr.h"
 #include "AuctionHouseBot.h"
 #include "ProgressionBis.h"
+#include "AuctionHouseBotPriceCatalog.h"
 #include "AuctionHouseSearcher.h"
 #include "Config.h"
 #include "Player.h"
@@ -879,6 +880,45 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
     return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
 }
 
+void AuctionHouseBot::RebuildSellerCatalog()
+{
+    CatalogCandidates.clear();
+    SellerQuoteCache.clear();
+    for (auto const& node : ItemListProportionNodesSeed)
+        if (node.Proportion > 0)
+        for (uint32 id : ItemCandidatesByItemClassAndQuality[node.ItemClassID][node.ItemQualityID])
+            CatalogCandidates.insert(id);
+}
+
+// The same deterministic seller path used for new listings, cached until config/candidates reload.
+uint64 AuctionHouseBot::GetSellerQuote(uint32 item, uint32 house)
+{
+    if (!StableSellerPrices || !SellingBotEnabled || !IsModuleEnabled() || !CatalogCandidates.count(item))
+        return 0;
+    if ((house == 2 && AllianceConfig.GetMaxItems() == 0)
+        || (house == 6 && HordeConfig.GetMaxItems() == 0)
+        || (house == 7 && NeutralConfig.GetMaxItems() == 0)
+        || (house != 2 && house != 6 && house != 7))
+        return 0;
+    auto entry = AuctionHouseMgr::GetAuctionHouseEntryFromHouse(AuctionHouseId(house));
+    if (!entry)
+        return 0;
+    auto key = std::make_pair(item, house);
+    auto cached = SellerQuoteCache.find(key);
+    if (cached != SellerQuoteCache.end())
+        return cached->second;
+    auto proto = sObjectMgr->GetItemTemplate(item);
+    uint64 bid = 0, buyout = 0;
+    if (proto)
+    {
+        CalculateItemValue(proto, bid, buyout, true);
+        if (!ApplyCraftedPricing(proto, entry, bid, buyout))
+            buyout = 0;
+    }
+    SellerQuoteCache.emplace(key, buyout);
+    return buyout;
+}
+
 std::unordered_set<uint32> AuctionHouseBot::GetItemIDsProducedByRecipes()
 {
     std::unordered_set<uint32> recipeItemIDs;
@@ -951,6 +991,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
 {
     // Clear old list and rebuild it
     ItemCandidatesByItemClassAndQuality.clear();
+    CatalogCandidates.clear();
+    SellerQuoteCache.clear();
 
     ItemIDsProducedByRecipes.clear();
     ItemIDsProducedByRecipes = GetItemIDsProducedByRecipes();
@@ -1191,6 +1233,7 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
                 ItemListProportionNodesLookup.push_back(curNode);
         }
     }
+    RebuildSellerCatalog();
 }
 
 uint32 AuctionHouseBot::GetRandomItemIDForListing()
@@ -1511,6 +1554,8 @@ void AuctionHouseBot::PopulateItemDropChances()
             );
         }
     }
+
+    RebuildSellerCatalog(); // Drop-rate pruning changes what the seller can actually select.
 
     if (debug_Out)
     {
@@ -2175,6 +2220,10 @@ bool AuctionHouseBot::IsModuleEnabled()
 
 void AuctionHouseBot::InitializeConfiguration()
 {
+    SellerQuoteCache.clear();
+    AhBotPriceCatalog::provider = [](std::uint32_t item, std::uint32_t house) -> std::uint64_t {
+        return auctionbot->GetSellerQuote(item, house);
+    };
     StableSellerPrices = sConfigMgr->GetOption<bool>("AuctionHouseBot.Seller.StablePrices", false);
     ProgressionPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProgressionPricing.Enabled", false);
     ProgressionBisMultiplier = sConfigMgr->GetOption<float>("AuctionHouseBot.ProgressionPricing.BisMultiplier", 1.5f);
