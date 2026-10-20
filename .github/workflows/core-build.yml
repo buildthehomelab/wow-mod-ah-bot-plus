@@ -23,6 +23,8 @@ jobs:
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/crafting_pricing_test.cpp -o /tmp/crafting-pricing-test
           /tmp/crafting-pricing-test
+          c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/catalog_provider_test.cpp tests/catalog_consumer_test.cpp -o /tmp/catalog-provider-test
+          /tmp/catalog-provider-test
       - name: Validate published catalog and generated membership
         run: |
           python3 tools/build_bis_header.py --check

@@ -170,6 +170,8 @@ private:
     bool DisabledItemTextFilter;
     bool DisabledRecipeProducedItemFilterEnabled;
     std::unordered_set<uint32> ItemIDsProducedByRecipes;
+    std::unordered_set<uint32> CatalogCandidates;
+    std::map<std::pair<uint32, uint32>, uint64> SellerQuoteCache;
     std::map<uint32, std::unordered_set<uint32>> DisabledRecipeProducedItemClassSubClasses;
     std::set<uint32> DisabledItems;
     std::set<uint32> IncludedItems;
@@ -349,6 +351,9 @@ private:
     AuctionHouseBot();
 
 public:
+    uint64 GetSellerQuote(uint32 item, uint32 house);
+    void RebuildSellerCatalog();
+
     static AuctionHouseBot* instance()
     {
         static AuctionHouseBot instance;
