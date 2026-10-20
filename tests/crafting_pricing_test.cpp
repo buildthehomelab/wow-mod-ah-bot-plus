@@ -73,5 +73,23 @@ int main()
     assert(!IsProgressionBis(0) && !IsProgressionBis(UINT32_MAX));
     for (std::size_t i = 1; i < ProgressionBis.size(); ++i)
         assert(ProgressionBis[i-1].item < ProgressionBis[i].item);
+    // Regression: optional leather upgrades must not be the required cost of skinned leather.
+    Model leather;
+    leather.items[1] = {1181, 15, {}, 1, true}; // Light Leather, naturally supplied.
+    leather.items[2] = {1983, 50, {{1, {{1, 4}}}}, 1, true};
+    leather.items[3] = {3337, 150, {{1, {{2, 5}}}}, 1, true};
+    leather.items[4] = {4683, 300, {{1, {{3, 6}}}}, 1, true};
+    leather.items[5] = {5894, 500, {{1, {{4, 6}}}}, 1, true}; // Rugged Leather.
+    leather.items[6] = {3400, 400, {}, 1, true}; // Runecloth.
+    leather.items[7] = {5000, 1250, {}}; // Thread reference.
+    leather.items[8] = {31849, 14155, {{1, {{5, 14}, {6, 10}, {7, 1}}}}}; // Runic Headband.
+    leather.items[9] = {1000, 500, {{1, {{5, 1}, {7, 1}}}}}; // Crafted-only intermediate retains its floor.
+    leather.Build(.15, .05);
+    assert(leather.Get(5).reference == 5894 && leather.Get(5).floor == 0);
+    assert(leather.Get(8).floor == 147099); // ~14.7g, not ~3,000g.
+    assert(leather.Get(9).floor > 1000);
+    leather.items[5].independentSupply = false;
+    leather.Build(.15, .05);
+    assert(leather.Get(5).floor > 5894); // Without independent supply, a real crafted route still costs materials.
     std::cout << "crafting pricing tests passed\n";
 }
