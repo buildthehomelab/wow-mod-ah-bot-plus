@@ -180,6 +180,7 @@ public:
     Acore::ChatCommands::ChatCommandTable GetCommands() const override
     {
         static Acore::ChatCommands::ChatCommandTable AHBotCommandTable = {
+            {"status", HandleAHBotStatusCommand, SEC_GAMEMASTER, Acore::ChatCommands::Console::Yes},
             {"update", HandleAHBotUpdateCommand, SEC_GAMEMASTER, Acore::ChatCommands::Console::Yes},
             {"reload", HandleAHBotReloadCommand, SEC_GAMEMASTER, Acore::ChatCommands::Console::Yes},
             {"empty",  HandleAHBotEmptyCommand,  SEC_GAMEMASTER, Acore::ChatCommands::Console::Yes},
@@ -191,6 +192,13 @@ public:
         };
 
         return commandTable;
+    }
+
+    static bool HandleAHBotStatusCommand(ChatHandler* handler, const char* /*args*/)
+    {
+        for (auto const& line : auctionbot->GetStatus())
+            handler->SendSysMessage(line.c_str());
+        return true;
     }
 
     static bool HandleAHBotUpdateCommand(ChatHandler* handler, const char* /*args*/)
@@ -238,6 +246,7 @@ public:
     static bool HandleAHBotHelpCommand(ChatHandler* handler, char const* /*args*/)
     {
         handler->PSendSysMessage("AuctionHouseBot commands:");
+        handler->PSendSysMessage("  .ahbot status - Shows live stock and buyer diagnostics");
         handler->PSendSysMessage("  .ahbot reload - Reloads configuration");
         handler->PSendSysMessage("  .ahbot empty  - Removes all AuctionHouseBot auctions");
         handler->PSendSysMessage("  .ahbot update - Runs an update cycle");

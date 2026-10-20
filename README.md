@@ -37,6 +37,7 @@ The AuctionHouseBot module adds the following in-game commands (for GMs only):
 
 | Command | Description |
 |----------|--------------|
+| `.ahbot status` | Shows enabled features, house routing, live auction counts, material shortages/refill units and buyer diagnostics. Read-only; does not trigger buying or selling. |
 | `.ahbot reload` | Reloads the AuctionHouseBot configuration file and updates settings. |
 | `.ahbot empty` | Removes all AuctionHouseBot auctions from all auction houses.<br>Player auctions are unaffected. Bids on affected items are returned to players.<br>Use with caution! |
 | `.ahbot update` | Forces the bot to refresh or repopulate auction listings immediately.<br>Note: If you have multiple minutes configured between Buy/Sell cycles, you may have to run this additional times before you see results. |
@@ -308,3 +309,32 @@ exceed a material's normal refill target. No existing auctions are deleted or re
 These are periodic supply rules, not an instantaneous unlimited availability guarantee.
 No SQL, client patch or addon update is required. Build/restart and in-game verification
 remain deployment steps; inspect logs and live faction stock after deployment.
+
+### Buyer diagnostics and input validation
+
+`.ahbot status` is available to GMs and the console. Stock counts use unexpired
+buyout listings and the same affordable-player-supply rules as replenishment.
+Refill-needed counts include new shortages and unfinished batches; they describe
+remaining demand, not a promise to list everything in the next cycle. Seller cap
+zero disables selling in that house. Legacy buying can continue, but targeted BiS
+buying fails closed because its reference quote requires a positive seller cap.
+
+Buyer counters accumulate in memory since process start, including across config
+reloads. Scan exclusions can count the same player auction on multiple cycles.
+`ineligible` includes expired/empty listings, protected player bids, missing templates
+and items excluded by the vendor-value setting. `no offer` counts unavailable BiS
+offers; `missing` counts absent item instances. Attempted rejections distinguish the
+vendor safeguard from an unaffordable asking price. Bot-owned/bot-bid auctions are
+excluded from these diagnostics. Purchases and bids count submitted actions, not
+independently audited database commits.
+
+Buyer candidate filtering happens before random selection, so expired or known
+ineligible auctions do not consume the configured candidate budget. Vendor limits
+compare the whole stack against unit vendor value times stack size, for both legacy
+and BiS buying. Existing vendor-value policy is otherwise unchanged.
+
+Cycle and candidate ranges accept an unsigned integer or `min:max`, with optional
+surrounding spaces. Empty, negative, reversed, trailing-junk and overflowing values
+are rejected with a log message and retain the previous valid value (startup default:
+1). Cycle intervals must be positive. Buyer candidates accept `0` or `0:0` to disable
+attempts; mixed zero/positive ranges are rejected.
