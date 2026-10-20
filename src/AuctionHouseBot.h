@@ -128,6 +128,7 @@ private:
     bool debug_Out;
     bool debug_Out_Filters;
 
+    bool StableSellerPrices = false;
     bool ProgressionPricingEnabled = false;
     float ProgressionBisMultiplier = 1.5f;
     bool CraftedPricingEnabled = false;

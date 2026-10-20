@@ -157,3 +157,33 @@ To check the generated runtime membership against the source catalog:
 python3 tools/build_bis_header.py --check
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
+
+## Stable faction prices and naturally supplied commodities
+
+`AuctionHouseBot.Seller.StablePrices = true` gives new Alliance and Horde listings
+identical per-unit bids and buyouts from the deterministic upper configured quote.
+Stack counts may differ, so compare unit prices rather than whole-stack totals. Both
+faction houses use the higher of their auction cuts for crafting floors; neutral
+auctions keep their own fee. Craft/progression settings continue to apply and buyer
+willingness to pay is unchanged. With all seller features off, legacy RNG ordering
+is preserved. This setting defaults off for other realms and reloads normally.
+
+Crafted pricing excludes optional conversion floors for trade goods that have an
+independent loot/gathering supply route. Skinning leather is priced from its normal
+commodity quote rather than requiring upgrades all the way from ruined scraps.
+Otherwise the scraps-to-light-to-medium-to-heavy-to-thick-to-rugged chain compounds
+conversion costs/margins and makes ordinary leather gear cost thousands of gold.
+Finished gear and crafted-only intermediates still receive ingredient-cost floors.
+
+Independent supply is detected from world skinning, fishing, disenchanting, prospecting,
+milling, creature, gameobject and reference loot templates, restricted to trade goods.
+These records establish a catalog supply route, not a guarantee of current player
+access, stock or demand. If no supply rows are returned, commodity conversion floors
+are disabled conservatively for that cache build; finished goods still use stable
+commodity references. The source query runs only when rebuilding the pricing cache.
+
+This change corrects future valuations. Recorded old/inflated auctions must be
+refreshed after rebuilding/restarting the reviewed module and applying its server
+pin/settings. Until that operational refresh is done, the professions addon can still
+show large asking-price margins from old stock. Such margins are estimates, not
+proof that a player or the AH buyer bot will pay that price.

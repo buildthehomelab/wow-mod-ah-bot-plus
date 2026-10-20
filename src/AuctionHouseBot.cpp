@@ -791,6 +791,38 @@ void AuctionHouseBot::PopulateCraftedPricing()
         for (auto const& material : recipe.materials)
             model.items.try_emplace(material.item);
     }
+    // Commodity conversions are optional supply routes. Pricing skinning leather as if
+    // every piece had to be upgraded from scraps compounds margins into thousands of gold.
+    // Only trade goods get this exemption; finished gear still follows ingredient costs.
+    std::unordered_set<uint32> independentlySupplied;
+    QueryResult supply = WorldDatabase.Query(R"SQL(
+        SELECT DISTINCT i.entry FROM item_template i JOIN (
+            SELECT Item FROM skinning_loot_template WHERE Item > 0
+            UNION SELECT Item FROM fishing_loot_template WHERE Item > 0
+            UNION SELECT Item FROM disenchant_loot_template WHERE Item > 0
+            UNION SELECT Item FROM prospecting_loot_template WHERE Item > 0
+            UNION SELECT Item FROM milling_loot_template WHERE Item > 0
+            UNION SELECT Item FROM creature_loot_template WHERE Item > 0
+            UNION SELECT Item FROM gameobject_loot_template WHERE Item > 0
+            UNION SELECT Item FROM reference_loot_template WHERE Item > 0
+        ) natural_supply ON natural_supply.Item = i.entry WHERE i.class = 7
+    )SQL");
+    if (supply)
+    {
+        do
+            independentlySupplied.insert(supply->Fetch()[0].Get<uint32>());
+        while (supply->NextRow());
+    }
+    else
+    {
+        // If supply metadata is unavailable, do not rebuild a graph known to inflate
+        // commodity conversions. Finished goods can still use stable commodity quotes.
+        LOG_WARN("module", "AuctionHouseBot: No natural commodity supply rows; commodity conversion floors disabled");
+        for (auto const& [id, item] : model.items)
+            if (sObjectMgr->GetItemTemplate(id)->Class == ITEM_CLASS_TRADE_GOODS)
+                independentlySupplied.insert(id);
+    }
+
     if (ProgressionPricingEnabled)
         for (auto const& entry : AhBotPricing::ProgressionBis)
             if (sObjectMgr->GetItemTemplate(entry.item))
@@ -800,6 +832,7 @@ void AuctionHouseBot::PopulateCraftedPricing()
         auto proto = sObjectMgr->GetItemTemplate(id);
         uint64 bid = 0, buyout = 0;
         CalculateItemValue(proto, bid, buyout, true);
+        item.independentSupply = independentlySupplied.count(id) != 0;
         item.vendor = proto->SellPrice;
         item.quote = std::max<uint64>(buyout, proto->SellPrice);
         if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(id))
@@ -814,8 +847,17 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
 {
     if (!CraftedPricingReady)
         PopulateCraftedPricing();
-    // Match AuctionEntry::GetAuctionCut, including neutral AH and Rate.Auction.Cut.
-    double cut = std::max(0.0, double(house->cutPercent) * sWorld->getRate(RATE_AUCTION_CUT) / 100.0);
+    // Match the actual house cut. Stable faction prices use the higher faction cut
+    // for both houses so the shared quote preserves the margin even with custom fees.
+    double cutPercent = house->cutPercent;
+    if (StableSellerPrices)
+    {
+        auto alliance = AuctionHouseMgr::GetAuctionHouseEntryFromHouse(AuctionHouseId::Alliance);
+        auto horde = AuctionHouseMgr::GetAuctionHouseEntryFromHouse(AuctionHouseId::Horde);
+        if (alliance && horde && (house == alliance || house == horde))
+            cutPercent = std::max(alliance->cutPercent, horde->cutPercent);
+    }
+    double cut = std::max(0.0, cutPercent * sWorld->getRate(RATE_AUCTION_CUT) / 100.0);
     auto it = CraftedPricingModels.find(cut);
     if (it == CraftedPricingModels.end())
     {
@@ -1307,9 +1349,9 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             uint64 buyoutPrice = 0;
             uint64 bidPrice = 0;
             // Keep the buyer on legacy valuations; recipe margins only affect new bot listings.
-            if (CraftedPricingEnabled || ProgressionPricingEnabled)
+            if (CraftedPricingEnabled || ProgressionPricingEnabled || StableSellerPrices)
             {
-                CalculateItemValue(prototype, bidPrice, buyoutPrice);
+                CalculateItemValue(prototype, bidPrice, buyoutPrice, StableSellerPrices);
                 if (!ApplyCraftedPricing(prototype, ahEntry, bidPrice, buyoutPrice))
                 {
                     batchCount++;
@@ -1331,7 +1373,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 item->SetItemRandomProperties(randomPropertyId);
 
             // Preserve legacy RNG ordering when recipe pricing is disabled.
-            if (!CraftedPricingEnabled && !ProgressionPricingEnabled)
+            if (!CraftedPricingEnabled && !ProgressionPricingEnabled && !StableSellerPrices)
                 CalculateItemValue(prototype, bidPrice, buyoutPrice);
 
             // Define a duration
@@ -1340,7 +1382,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             // Set stack size
             uint32 stackCount = GetStackSizeForItem(prototype);
             // Auction money fields are uint32 totals, even when per-unit pricing uses uint64.
-            if (CraftedPricingEnabled || ProgressionPricingEnabled)
+            if (CraftedPricingEnabled || ProgressionPricingEnabled || StableSellerPrices)
                 stackCount = std::min<uint64>(stackCount, UINT32_MAX / std::max<uint64>(1, std::max(buyoutPrice, bidPrice)));
             item->SetCount(stackCount);
 
@@ -2133,6 +2175,7 @@ bool AuctionHouseBot::IsModuleEnabled()
 
 void AuctionHouseBot::InitializeConfiguration()
 {
+    StableSellerPrices = sConfigMgr->GetOption<bool>("AuctionHouseBot.Seller.StablePrices", false);
     ProgressionPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProgressionPricing.Enabled", false);
     ProgressionBisMultiplier = sConfigMgr->GetOption<float>("AuctionHouseBot.ProgressionPricing.BisMultiplier", 1.5f);
     if (!std::isfinite(ProgressionBisMultiplier) || ProgressionBisMultiplier < 1 || ProgressionBisMultiplier > 10)

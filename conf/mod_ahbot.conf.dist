@@ -1092,3 +1092,10 @@ AuctionHouseBot.CraftedPricing.ProfitMargin = 0.15
 AuctionHouseBot.ProgressionPricing.Enabled = false
 # 1.5 = 50% premium. Valid range 1..10; invalid values fall back to 1.5.
 AuctionHouseBot.ProgressionPricing.BisMultiplier = 1.5
+
+# Use one deterministic upper configured unit quote instead of rolling listing prices.
+# Alliance and Horde get identical new per-unit prices; stack quantities may differ.
+# Crafted/progression floors still apply, using the higher faction fee for both houses.
+# Neutral auctions retain their own fee. Existing auctions require an explicit refresh.
+# Seller only; the buyer's willingness to pay and randomness are unchanged.
+AuctionHouseBot.Seller.StablePrices = false

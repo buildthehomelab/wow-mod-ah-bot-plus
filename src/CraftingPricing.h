@@ -21,6 +21,8 @@ struct Item
     double vendor = 0;      // NPC pays the player this amount.
     std::vector<Recipe> recipes;
     double demandMultiplier = 1;
+    // Gathering/loot supplies this commodity without running its optional conversion recipes.
+    bool independentSupply = false;
 };
 struct Price { double reference = 0; double floor = 0; };
 
@@ -126,7 +128,7 @@ private:
         }
         double demand = std::isfinite(item.demandMultiplier) && item.demandMultiplier >= 1 ? item.demandMultiplier : 1;
         Price price{std::max(item.quote, item.vendor) * demand, 0};
-        if (std::isfinite(cheapest))
+        if (!item.independentSupply && std::isfinite(cheapest))
         {
             price.floor = std::ceil(std::max(cheapest, item.vendor) * factor * demand);
             price.reference = std::max(price.reference, price.floor);
