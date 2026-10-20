@@ -22,6 +22,7 @@
 #include "AuctionHouseMgr.h"
 #include "AuctionHouseBot.h"
 #include "ProgressionBis.h"
+#include "BisBuyerPricing.h"
 #include "AuctionHouseBotPriceCatalog.h"
 #include "AuctionHouseSearcher.h"
 #include "Config.h"
@@ -878,6 +879,24 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
         bid = uint64(std::ceil(bid * double(ProgressionBisMultiplier)));
     }
     return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+}
+
+bool AuctionHouseBot::GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer)
+{
+    offer = 0;
+    if (!ProgressionBuyerPricingEnabled || !AhBotPricing::IsProgressionBis(item))
+        return false;
+    // Targeted items fail closed if the corresponding reference/buyer is unavailable.
+    auto proto = sObjectMgr->GetItemTemplate(item);
+    if (!BuyingBotEnabled || BuyingBotBuyCandidatesPerBuyCycleMax == 0 || !ProgressionPricingEnabled
+        || !proto || proto->Bonding == BIND_WHEN_PICKED_UP || proto->Bonding == BIND_QUEST_ITEM
+        || (BuyerSkipItemsWithoutVendorPrice && IsItemWithoutVendorPrice(proto)))
+        return true;
+    offer = AhBotPricing::BisBuyerOffer(GetSellerQuote(item, house), ProgressionBuyerMarketPercent);
+    uint32 vendor = item < vendorItemsPrices.size() ? vendorItemsPrices[item] : UINT32_MAX;
+    if (PreventOverpayingForVendorItems && vendor > 0 && vendor != UINT32_MAX)
+        offer = std::min<std::uint64_t>(offer, vendor);
+    return true;
 }
 
 void AuctionHouseBot::RebuildSellerCatalog()
@@ -1993,16 +2012,31 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         // Calculate a potential price for the item
         uint64 willingToSpendPerItemPrice = 0;
         uint64 discardBidPrice = 0;
-        CalculateItemValue(prototype, discardBidPrice, willingToSpendPerItemPrice);
-        willingToSpendPerItemPrice = (uint64)((float)willingToSpendPerItemPrice * BuyingBotAcceptablePriceModifier);
+        std::uint64_t referenceOffer = 0;
+        bool const referenceBuyer = GetProgressionBuyerOffer(prototype->ItemId, config->GetAHID(), referenceOffer);
+        if (referenceBuyer)
+        {
+            if (!referenceOffer)
+                continue;
+            willingToSpendPerItemPrice = referenceOffer;
+        }
+        else
+        {
+            CalculateItemValue(prototype, discardBidPrice, willingToSpendPerItemPrice);
+            willingToSpendPerItemPrice = (uint64)((float)willingToSpendPerItemPrice * BuyingBotAcceptablePriceModifier);
+        }
         uint64 willingToPayForStackPrice = willingToSpendPerItemPrice * pItem->GetCount();
+        if (referenceBuyer)
+            willingToPayForStackPrice = std::min<uint64>(willingToPayForStackPrice, UINT32_MAX);
 
         // Determine if it's a bid, buyout, or skip
         bool doBuyout = false;
         bool doBid = false;
         uint64 calcBidAmount = 0;
 
-        if (auction->buyout != 0 && auction->buyout < willingToPayForStackPrice)
+        if (referenceBuyer
+            ? AhBotPricing::WithinBisBuyerOffer(auction->buyout, willingToSpendPerItemPrice, pItem->GetCount())
+            : auction->buyout != 0 && auction->buyout < willingToPayForStackPrice)
             doBuyout = true;
         else
         {
@@ -2030,12 +2064,15 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         uint32 vendorSellPrice = prototype->ItemId < vendorItemsPrices.size() ? vendorItemsPrices[prototype->ItemId] : UINT32_MAX;
         if (PreventOverpayingForVendorItems && vendorSellPrice > 0)
         {
-            if (doBuyout && auction->buyout > vendorSellPrice)
+            uint64 vendorLimit = vendorSellPrice;
+            if (referenceBuyer && vendorSellPrice != UINT32_MAX)
+                vendorLimit *= pItem->GetCount();
+            if (doBuyout && auction->buyout > vendorLimit)
             {
                 doBuyout = false;
                 preventedOverpayingForVendorItem = true;
             }
-            if (doBid && calcBidAmount > vendorSellPrice)
+            if (doBid && calcBidAmount > vendorLimit)
             {
                 doBid = false;
                 preventedOverpayingForVendorItem = true;
@@ -2221,6 +2258,13 @@ bool AuctionHouseBot::IsModuleEnabled()
 void AuctionHouseBot::InitializeConfiguration()
 {
     SellerQuoteCache.clear();
+    ProgressionBuyerPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.ProgressionPricing.Enabled", false);
+    ProgressionBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent", 90);
+    if (ProgressionBuyerMarketPercent == 0 || ProgressionBuyerMarketPercent >= 100)
+        ProgressionBuyerMarketPercent = 90;
+    AhBotPriceCatalog::buyerProvider = [](std::uint32_t item, std::uint32_t house, std::uint64_t& offer) {
+        return auctionbot->GetProgressionBuyerOffer(item, house, offer);
+    };
     AhBotPriceCatalog::provider = [](std::uint32_t item, std::uint32_t house) -> std::uint64_t {
         return auctionbot->GetSellerQuote(item, house);
     };

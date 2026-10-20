@@ -24,6 +24,7 @@
 #include "Common.h"
 #include "ObjectGuid.h"
 #include "CraftingPricing.h"
+#include "AuctionHouseBotPriceCatalog.h"
 
 #include <map>
 #include <vector>
@@ -139,6 +140,8 @@ private:
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;
     bool BuyingBotEnabled;
+    bool ProgressionBuyerPricingEnabled = false;
+    uint32 ProgressionBuyerMarketPercent = 90;
     bool ReturnExpiredAuctionItemsToBot;
     uint32 CyclesBetweenBuyActionMin;
     uint32 CyclesBetweenBuyAction;
@@ -352,6 +355,7 @@ private:
 
 public:
     uint64 GetSellerQuote(uint32 item, uint32 house);
+    bool GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
     void RebuildSellerCatalog();
 
     static AuctionHouseBot* instance()
