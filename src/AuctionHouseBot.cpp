@@ -23,6 +23,7 @@
 #include "AuctionHouseBot.h"
 #include "ProgressionBis.h"
 #include "BisBuyerPricing.h"
+#include "BuyerSafety.h"
 #include "AuctionHouseBotPriceCatalog.h"
 #include "AuctionHouseSearcher.h"
 #include "Config.h"
@@ -2192,28 +2193,50 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
     for (AuctionHouseBotCharacter const& botCharacter : AHCharacters)
         ahBotGUIDs.insert(botCharacter.CharacterGUID);
 
+    auto& stats = BuyerStatistics[config->GetAHID()];
+    ++stats.cycles;
+    stats.lastCycle = time(nullptr);
     vector<uint32> possibleBids;
+    auto now = time(nullptr);
     for (auto const& [auctionID, auctionEntry] : auctionHouse->GetAuctions())
     {
+        // Bot stock is not a rejected player listing and is excluded from diagnostics.
         if (ahBotGUIDs.count(auctionEntry->owner.GetCounter()) || ahBotGUIDs.count(auctionEntry->bidder.GetCounter()))
             continue;
-        if (BuyingBotWillBidAgainstPlayers == false && auctionEntry->bid != 0)
+        auto proto = sObjectMgr->GetItemTemplate(auctionEntry->item_template);
+        if (!AhBotSafety::CandidateEligible(auctionEntry->expire_time, now, auctionEntry->itemCount,
+            false, auctionEntry->bid != 0, BuyingBotWillBidAgainstPlayers, proto != nullptr,
+            proto && !IsItemWithoutVendorPrice(proto), BuyerSkipItemsWithoutVendorPrice))
+        {
+            ++stats.ineligible;
             continue;
+        }
+        auto item = sAuctionMgr->GetAItem(auctionEntry->item_guid);
+        if (!item || !item->GetCount())
+        {
+            ++stats.missing;
+            continue;
+        }
+        std::uint64_t offer = 0;
+        if (GetProgressionBuyerOffer(proto->ItemId, config->GetAHID(), offer) && !offer)
+        {
+            ++stats.noOffer;
+            continue;
+        }
         possibleBids.push_back(auctionID);
     }
 
     if (possibleBids.empty())
         return;
 
-    int randBuyingBotBuyCandidatesPerBuyCycle = urand(BuyingBotBuyCandidatesPerBuyCycleMin, BuyingBotBuyCandidatesPerBuyCycleMax);
-    for (int count = 1; count <= randBuyingBotBuyCandidatesPerBuyCycle; ++count)
+    uint32 randBuyingBotBuyCandidatesPerBuyCycle = urand(BuyingBotBuyCandidatesPerBuyCycleMin, BuyingBotBuyCandidatesPerBuyCycleMax);
+    for (uint32 count = 0; count < randBuyingBotBuyCandidatesPerBuyCycle; ++count)
     {
         // Do we have anything to bid? If not, stop here.
         if (possibleBids.empty())
         {
             //if (debug_Out) sLog->outError( "AHBuyer: I have no items to bid on.");
-            count = randBuyingBotBuyCandidatesPerBuyCycle;
-            continue;
+            break;
         }
 
         // Choose random auction from possible currentAuctionItemListCount
@@ -2229,6 +2252,8 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
 
         if (!auction)
             continue;
+
+        ++stats.considered;
 
         // get exact item information
 		Item *pItem = sAuctionMgr->GetAItem(auction->item_guid);
@@ -2311,20 +2336,21 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         uint32 vendorSellPrice = prototype->ItemId < vendorItemsPrices.size() ? vendorItemsPrices[prototype->ItemId] : UINT32_MAX;
         if (PreventOverpayingForVendorItems && vendorSellPrice > 0)
         {
-            uint64 vendorLimit = vendorSellPrice;
-            if (referenceBuyer && vendorSellPrice != UINT32_MAX)
-                vendorLimit *= pItem->GetCount();
-            if (doBuyout && auction->buyout > vendorLimit)
+            if (doBuyout && AhBotSafety::AboveVendorLimit(auction->buyout, vendorSellPrice, pItem->GetCount()))
             {
                 doBuyout = false;
                 preventedOverpayingForVendorItem = true;
             }
-            if (doBid && calcBidAmount > vendorLimit)
+            if (doBid && AhBotSafety::AboveVendorLimit(calcBidAmount, vendorSellPrice, pItem->GetCount()))
             {
                 doBid = false;
                 preventedOverpayingForVendorItem = true;
             }
         }
+        if (preventedOverpayingForVendorItem)
+            ++stats.vendorLimited;
+        else if (!doBid && !doBuyout)
+            ++stats.tooExpensive;
 
         if (debug_Out)
         {
@@ -2364,6 +2390,7 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
 
         if (doBid)
         {
+            ++stats.bids;
             auto trans = CharacterDatabase.BeginTransaction();
 
             if (auction->bidder)
@@ -2384,6 +2411,7 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         }
         else if (doBuyout)
         {
+            ++stats.purchases;
             auto trans = CharacterDatabase.BeginTransaction();
 
             if ((auction->bidder) && (AHBplayer->GetGUID() != auction->bidder))
@@ -2401,6 +2429,87 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
             CharacterDatabase.CommitTransaction(trans);
         }
     }
+}
+
+std::vector<std::string> AuctionHouseBot::GetStatus()
+{
+    std::vector<std::string> lines;
+    std::ostringstream summary;
+    summary << "AHBot: seller=" << SellingBotEnabled << " buyer=" << BuyingBotEnabled
+        << " characters=" << AHCharacters.size() << " material stock=" << MaterialStockEnabled;
+    lines.push_back(summary.str());
+    std::set<ObjectGuid::LowType> bots;
+    for (auto const& bot : AHCharacters)
+        bots.insert(bot.CharacterGUID);
+    auto now = time(nullptr);
+    for (auto config : {&AllianceConfig, &HordeConfig, &NeutralConfig})
+    {
+        auto houseID = config->GetAHID();
+        bool routed = houseID == 7 || !sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION);
+        auto house = routed ? sAuctionMgr->GetAuctionsMap(config->GetAHFID()) : nullptr;
+        std::ostringstream line;
+        line << "House " << houseID << ": " << (routed ? "active routing" : "shared AH: use house 7")
+            << ", seller cap=" << config->GetMaxItems();
+        if (house)
+        {
+            std::map<uint32, uint32> botUnits, playerUnits;
+            uint32 live = 0;
+            for (auto const& [id, auction] : house->GetAuctions())
+            {
+                if (auction->expire_time <= now)
+                    continue;
+                ++live;
+                auto policy = MaterialStockPolicies.find(auction->item_template);
+                if (policy == MaterialStockPolicies.end() || !auction->buyout || !auction->itemCount)
+                    continue;
+                if (bots.count(auction->owner.GetCounter()))
+                    AhBotStock::Count(botUnits, auction->item_template, auction->itemCount, policy->second.refill);
+                else if (MaterialStockRespectPlayerListings && StableSellerPrices
+                    && AhBotStock::Affordable(auction->buyout, auction->itemCount,
+                        GetSellerQuote(auction->item_template, houseID)))
+                    AhBotStock::Count(playerUnits, auction->item_template, auction->itemCount, policy->second.refill);
+            }
+            uint32 shortages = 0, refilling = 0;
+            uint64 unitsToTarget = 0;
+            auto batch = MaterialStockRefilling.find(houseID);
+            for (auto const& [item, policy] : MaterialStockPolicies)
+            {
+                uint64 players = AhBotStock::Units(playerUnits, item);
+                uint64 total = players + AhBotStock::Units(botUnits, item);
+                if (total < policy.minimum)
+                    ++shortages;
+                if (players < policy.minimum && total < policy.refill
+                    && (total < policy.minimum || (batch != MaterialStockRefilling.end() && batch->second.count(item))))
+                {
+                    ++refilling;
+                    unitsToTarget += policy.refill - total;
+                }
+            }
+            line << ", live auctions=" << live;
+            if (MaterialStockEnabled)
+                line << ", materials below minimum=" << shortages << "/" << MaterialStockPolicies.size()
+                    << ", refill needed=" << refilling << " items/" << unitsToTarget << " units";
+        }
+        lines.push_back(line.str());
+        auto found = BuyerStatistics.find(houseID);
+        if (found == BuyerStatistics.end())
+        {
+            lines.push_back("  Buyer: no cycles recorded since process start.");
+            continue;
+        }
+        auto const& stats = found->second;
+        std::ostringstream buyer;
+        buyer << "  Buyer since process start: cycles=" << stats.cycles << " considered=" << stats.considered
+            << " purchases=" << stats.purchases << " bids=" << stats.bids
+            << " last cycle age=" << (now - stats.lastCycle) << "s";
+        lines.push_back(buyer.str());
+        std::ostringstream rejected;
+        rejected << "  Repeated scan exclusions: ineligible=" << stats.ineligible << " missing=" << stats.missing
+            << " no offer=" << stats.noOffer << "; attempted rejections: vendor limit=" << stats.vendorLimited
+            << " too expensive=" << stats.tooExpensive;
+        lines.push_back(rejected.str());
+    }
+    return lines;
 }
 
 void AuctionHouseBot::Update()
@@ -2968,24 +3077,13 @@ void AuctionHouseBot::SetCyclesBetweenBuyOrSell()
 void AuctionHouseBot::SetBuyingBotBuyCandidatesPerBuyCycle()
 {
     std::string candidatesPerCycleString = sConfigMgr->GetOption<string>("AuctionHouseBot.Buyer.BuyCandidatesPerBuyCycle", "1");
-    GetConfigMinAndMax(candidatesPerCycleString, BuyingBotBuyCandidatesPerBuyCycleMin, BuyingBotBuyCandidatesPerBuyCycleMax);
+    GetConfigMinAndMax(candidatesPerCycleString, BuyingBotBuyCandidatesPerBuyCycleMin, BuyingBotBuyCandidatesPerBuyCycleMax, true);
 }
 
-void AuctionHouseBot::GetConfigMinAndMax(std::string config, uint32& min, uint32& max)
+void AuctionHouseBot::GetConfigMinAndMax(std::string config, uint32& min, uint32& max, bool allowZero)
 {
-    size_t pos = config.find(':');
-    if (pos != std::string::npos)
-    {
-        min = std::stoul(config.substr(0, pos));
-        max = std::stoul(config.substr(pos + 1));
-
-        if (min < 1)
-            min = 1;
-        if (max < min)
-            max = min;
-    }
-    else
-        min = max = std::stoul(config);
+    if (!AhBotSafety::ParseRange(config, min, max, allowZero))
+        LOG_ERROR("module", "AuctionHouseBot: Invalid range '{}'; retaining {}:{}", config, min, max);
 }
 
 void AuctionHouseBot::AddCharacters(std::string characterGUIDString)

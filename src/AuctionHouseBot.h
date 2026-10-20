@@ -51,8 +51,8 @@ class FactionSpecificAuctionHouseConfig
 private:
     uint32 AHID;
     uint32 AHFID;
-    uint32 minItems;
-    uint32 maxItems;
+    uint32 minItems = 0;
+    uint32 maxItems = 0;
 
 public:
     FactionSpecificAuctionHouseConfig(uint32 ahid)
@@ -128,6 +128,13 @@ public:
     uint32 CurrentBotCharGUID;
 
 private:
+    struct BuyerStats
+    {
+        uint64 cycles = 0, considered = 0, purchases = 0, bids = 0;
+        uint64 ineligible = 0, missing = 0, noOffer = 0, vendorLimited = 0, tooExpensive = 0;
+        time_t lastCycle = 0;
+    };
+    std::map<uint32, BuyerStats> BuyerStatistics;
     bool debug_Out;
     bool debug_Out_Filters;
 
@@ -382,6 +389,7 @@ private:
     AuctionHouseBot();
 
 public:
+    std::vector<std::string> GetStatus();
     uint64 GetSellerQuote(uint32 item, uint32 house);
     bool GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
     void RebuildSellerCatalog();
@@ -403,7 +411,7 @@ public:
     uint32 GetRandomStackIncrementValue(std::string configKeyString, uint32 defaultValue);
     void SetCyclesBetweenBuyOrSell();
     void SetBuyingBotBuyCandidatesPerBuyCycle();
-    void GetConfigMinAndMax(std::string config, uint32& min, uint32& max);
+    void GetConfigMinAndMax(std::string config, uint32& min, uint32& max, bool allowZero = false);
     void AddCharacters(std::string characterGUIDString);
     void ParseNumberListToSet(std::set<uint32>& workingItemIDSet, std::string itemString, const char* parentOperationName);
     void AddToNumberListSet(std::set<uint32>& workingItemIDSet, uint32 itemID, const char* parentOperationName);
