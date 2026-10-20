@@ -33,6 +33,7 @@
 #include "SharedDefines.h"
 #include "SpellMgr.h"
 #include <cmath>
+#include <sstream>
 
 #include <set>
 #include <unordered_map>
@@ -910,9 +911,12 @@ void AuctionHouseBot::PopulateMaterialStock()
 {
     MaterialStockItems.clear();
     MaterialStockCursors.clear();
+    MaterialStockPolicies.clear();
+    MaterialStockRefilling.clear();
     if (!MaterialStockEnabled)
         return;
     std::set<uint32> materials;
+    std::map<uint32, uint32> recipeQuantities;
     for (uint32 id = 1; id < sSpellStore.GetNumRows(); ++id)
     {
         auto spell = sSpellMgr->GetSpellInfo(id);
@@ -925,9 +929,15 @@ void AuctionHouseBot::PopulateMaterialStock()
                 profession = true;
         if (!profession)
             continue;
+        std::map<uint32, uint64> consumed;
         for (uint8 slot = 0; slot < MAX_SPELL_REAGENTS; ++slot)
             if (spell->Reagent[slot] > 0 && spell->ReagentCount[slot] > 0)
-                materials.insert(uint32(spell->Reagent[slot]));
+                consumed[uint32(spell->Reagent[slot])] += uint32(spell->ReagentCount[slot]);
+        for (auto const& [item, quantity] : consumed)
+        {
+            materials.insert(item);
+            recipeQuantities[item] = std::max(recipeQuantities[item], uint32(std::min<uint64>(quantity, 10000)));
+        }
     }
     // Vellum is consumed by the enchant-item target rather than Reagent[].
     for (auto const& [id, proto] : *sObjectMgr->GetItemTemplateStore())
@@ -946,9 +956,18 @@ void AuctionHouseBot::PopulateMaterialStock()
             continue;
         }
         MaterialStockItems.push_back(id);
+        auto base = MaterialStockUseMaterialTargets
+            ? (proto->Quality >= ITEM_QUALITY_RARE ? MaterialStockRare : MaterialStockCommon)
+            : AhBotStock::Policy{MaterialStockMinUnits, MaterialStockRefillUnits};
+        uint32 recipeUnits = MaterialStockUseMaterialTargets && MaterialStockRecipeAwareTargets ? recipeQuantities[id] : 0;
+        auto policy = AhBotStock::Normalize(base.minimum, base.refill, recipeUnits);
+        auto custom = MaterialStockOverrides.find(id);
+        if (custom != MaterialStockOverrides.end())
+            policy = custom->second; // Explicit admin targets are authoritative.
+        MaterialStockPolicies.emplace(id, policy);
     }
-    LOG_INFO("module", "AHBot material stock: {} tradable materials, {} excluded; target {} bot units per enabled house",
-        MaterialStockItems.size(), excluded, MaterialStockMinUnits);
+    LOG_INFO("module", "AHBot material stock: {} tradable materials, {} excluded; per-material batches enabled for each house",
+        MaterialStockItems.size(), excluded);
 }
 
 void AuctionHouseBot::RebuildSellerCatalog()
@@ -1365,14 +1384,98 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
         std::set<ObjectGuid::LowType> bots;
         for (auto const& bot : AHCharacters)
             bots.insert(bot.CharacterGUID);
-        std::map<uint32, uint32> available;
+        std::map<uint32, uint32> botSupply, playerSupply;
+        std::set<uint32> playerItems;
+        uint32 activePricingErrors = 0, activeLargeStacks = 0;
         auto now = time(nullptr);
-        // Count only our unexpired buyout supply; expensive player asks cannot suppress it.
         for (auto const& [id, auction] : auctionHouse->GetAuctions())
-            if (auction->expire_time > now && auction->buyout > 0 && bots.count(auction->owner.GetCounter()))
-                AhBotStock::Count(available, auction->item_template, auction->itemCount, MaterialStockMinUnits);
-        stockRequests = AhBotStock::Plan(MaterialStockItems, available, MaterialStockMinUnits,
-            ItemsPerCycle, MaterialStockCursors[config->GetAHID()]);
+        {
+            if (auction->expire_time <= now || !auction->buyout || !auction->itemCount)
+                continue;
+            auto policy = MaterialStockPolicies.find(auction->item_template);
+            if (policy == MaterialStockPolicies.end())
+                continue;
+            if (bots.count(auction->owner.GetCounter()))
+            {
+                AhBotStock::Count(botSupply, auction->item_template, auction->itemCount, policy->second.refill);
+                auto proto = sObjectMgr->GetItemTemplate(auction->item_template);
+                // Recognize live special supply after restart without a new persistence table.
+                // Conservatively treat legacy vendor-price/large listings as specials too.
+                if (proto && AhBotStock::Affordable(auction->buyout, auction->itemCount, proto->SellPrice))
+                    ++activePricingErrors;
+                if (auction->itemCount > 20)
+                    ++activeLargeStacks;
+            }
+            else
+            {
+                playerItems.insert(auction->item_template);
+                if (MaterialStockRespectPlayerListings && StableSellerPrices
+                    && AhBotStock::Affordable(auction->buyout, auction->itemCount,
+                        GetSellerQuote(auction->item_template, config->GetAHID())))
+                    AhBotStock::Count(playerSupply, auction->item_template, auction->itemCount, policy->second.refill);
+            }
+        }
+        stockRequests = AhBotStock::Plan(MaterialStockItems, MaterialStockPolicies, botSupply, playerSupply,
+            MaterialStockRefilling[config->GetAHID()], ItemsPerCycle, MaterialStockCursors[config->GetAHID()]);
+        auto& nextError = NextPricingError[config->GetAHID()];
+        auto& nextLarge = NextLargeStacks[config->GetAHID()];
+        // An initial cooldown also prevents restart/reload from manufacturing new bargains.
+        if (!nextError)
+            nextError = now + PricingErrorsCooldown;
+        if (!nextLarge)
+            nextLarge = now + LargeStacksCooldown;
+        auto addSpecial = [&](AhBotStock::Kind kind, uint32 wanted)
+        {
+            std::set<uint32> queued;
+            for (auto const& request : stockRequests)
+                queued.insert(request.item);
+            std::vector<uint32> candidates;
+            for (uint32 item : MaterialStockItems)
+            {
+                // Never discount or add bulk beside ANY live player buyout of the item.
+                if (playerItems.count(item) || queued.count(item))
+                    continue;
+                auto proto = sObjectMgr->GetItemTemplate(item);
+                if (!proto || !GetSellerQuote(item, config->GetAHID()))
+                    continue;
+                if (kind == AhBotStock::Kind::PricingError ? proto->SellPrice > 0 : proto->GetMaxStackSize() > 20)
+                    candidates.push_back(item);
+            }
+            while (wanted && stockRequests.size() < ItemsPerCycle && !candidates.empty())
+            {
+                uint32 index = urand(0, candidates.size() - 1);
+                uint32 item = candidates[index];
+                candidates[index] = candidates.back();
+                candidates.pop_back();
+                auto proto = sObjectMgr->GetItemTemplate(item);
+                uint64 price = kind == AhBotStock::Kind::PricingError
+                    ? AhBotStock::VendorBargain(proto->SellPrice, PricingErrorsVendorPercent)
+                    : GetSellerQuote(item, config->GetAHID());
+                uint32 cap = std::min<uint64>(proto->GetMaxStackSize(), UINT32_MAX / std::max<uint64>(price, 1));
+                uint32 count;
+                if (kind == AhBotStock::Kind::PricingError)
+                    count = std::min(20u, std::min(cap, GetStackSizeForItem(proto, true)));
+                else
+                {
+                    cap = std::min(cap, LargeStacksMaxUnits);
+                    if (cap <= 20)
+                        continue;
+                    count = urand(21, cap);
+                }
+                if (!count)
+                    continue;
+                stockRequests.push_back({item, count, kind});
+                --wanted;
+            }
+        };
+        // Both events are opt-in and use their own per-house cooldowns; ordinary deficits
+        // always get the cycle budget first. No auction/player prices feed back into quotes.
+        if (StableSellerPrices && PricingErrorsEnabled && !activePricingErrors
+            && now >= nextError && urand(1, 100) <= PricingErrorsChance)
+            addSpecial(AhBotStock::Kind::PricingError, 1);
+        if (StableSellerPrices && LargeStacksEnabled && activeLargeStacks < 2
+            && now >= nextLarge && urand(1, 100) <= LargeStacksChance)
+            addSpecial(AhBotStock::Kind::LargeStack, std::min(2u - activeLargeStacks, urand(1, 2)));
     }
     uint32 currentAuctionItemListCount = auctionHouse->Getcount();
     uint32 randomBudget = currentAuctionItemListCount < minItems && currentAuctionItemListCount < maxItems
@@ -1411,11 +1514,13 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             // Either generate a new item ID to list, or grab from the remaining list
             uint32 itemID;
             uint32 stockDeficit = 0;
+            AhBotStock::Kind listingKind = AhBotStock::Kind::Reserve;
             if (stockIndex < stockRequests.size())
             {
                 auto request = stockRequests[stockIndex++];
                 itemID = request.item;
                 stockDeficit = request.deficit;
+                listingKind = request.kind;
                 prototype = sObjectMgr->GetItemTemplate(itemID);
                 if (!prototype)
                 {
@@ -1485,12 +1590,26 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 }
             }
 
+            // Managed ingredients must only enter through reserve planning; random filling
+            // would bypass the batch targets and compete with sufficient player supply.
+            if (MaterialStockEnabled && !stockDeficit && MaterialStockPolicies.count(itemID))
+            {
+                ActiveListMultipleItemID = 0;
+                RemainingListMultipleCount = 0;
+                batchCount++;
+                continue;
+            }
             Player* AHBplayer = AHBPlayers[urand(0, AHBPlayers.size() - 1)];
 
             uint64 buyoutPrice = 0;
             uint64 bidPrice = 0;
             // Keep the buyer on legacy valuations; recipe margins only affect new bot listings.
-            if (CraftedPricingEnabled || ProgressionPricingEnabled || StableSellerPrices)
+            if (listingKind == AhBotStock::Kind::PricingError)
+            {
+                // Deliberate one-off exception: normal catalog quotes/floors stay unchanged.
+                buyoutPrice = bidPrice = AhBotStock::VendorBargain(prototype->SellPrice, PricingErrorsVendorPercent);
+            }
+            else if (CraftedPricingEnabled || ProgressionPricingEnabled || StableSellerPrices)
             {
                 CalculateItemValue(prototype, bidPrice, buyoutPrice, StableSellerPrices);
                 if (!ApplyCraftedPricing(prototype, ahEntry, bidPrice, buyoutPrice))
@@ -1520,6 +1639,17 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 batchCount++;
                 continue;
             }
+            uint32 reserveStack = 0;
+            if (stockDeficit)
+            {
+                reserveStack = AhBotStock::ListingUnits(listingKind, stockDeficit, prototype->GetMaxStackSize(),
+                    GetStackSizeForItem(prototype, true), std::max(buyoutPrice, bidPrice));
+                if (!reserveStack)
+                {
+                    batchCount++;
+                    continue;
+                }
+            }
             Item* item = Item::CreateItem(itemID, 1, AHBplayer);
             if (item == NULL)
             {
@@ -1538,12 +1668,11 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 CalculateItemValue(prototype, bidPrice, buyoutPrice);
 
             // Define a duration
-            uint32 etime = urand(ListingExpireTimeInSecondsMin, ListingExpireTimeInSecondsMax);
+            uint32 etime = listingKind == AhBotStock::Kind::Reserve
+                ? urand(ListingExpireTimeInSecondsMin, ListingExpireTimeInSecondsMax) : SpecialListingsLifetime;
 
             // Set stack size
-            uint32 stackCount = GetStackSizeForItem(prototype, stockDeficit != 0);
-            if (stockDeficit)
-                stackCount = std::min(stockDeficit, stackCount);
+            uint32 stackCount = stockDeficit ? reserveStack : GetStackSizeForItem(prototype);
             // Auction money fields are uint32 totals, even when per-unit pricing uses uint64.
             if (stockDeficit || CraftedPricingEnabled || ProgressionPricingEnabled || StableSellerPrices)
                 stackCount = std::min<uint64>(stackCount, UINT32_MAX / std::max<uint64>(1, std::max(buyoutPrice, bidPrice)));
@@ -1569,6 +1698,16 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             sAuctionMgr->AddAItem(item);
             auctionHouse->AddAuction(auctionEntry);
             auctionEntry->SaveToDB(trans);
+            if (listingKind == AhBotStock::Kind::PricingError)
+            {
+                NextPricingError[config->GetAHID()] = time(nullptr) + PricingErrorsCooldown;
+                LOG_INFO("module", "AHBot pricing error: house {} item {} units {} unit price {}", config->GetAHID(), itemID, stackCount, buyoutPrice);
+            }
+            else if (listingKind == AhBotStock::Kind::LargeStack)
+            {
+                NextLargeStacks[config->GetAHID()] = time(nullptr) + LargeStacksCooldown;
+                LOG_INFO("module", "AHBot large stack: house {} item {} units {}", config->GetAHID(), itemID, stackCount);
+            }
             itemsGenerated++;
             batchCount++;
         }
@@ -2371,10 +2510,44 @@ void AuctionHouseBot::InitializeConfiguration()
     };
     MaterialStockEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.MaterialStock.Enabled", false);
     MaterialStockMinUnits = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.MinUnits", 20), 1u, 10000u);
+    MaterialStockRefillUnits = std::max(MaterialStockMinUnits,
+        std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.RefillUnits", MaterialStockMinUnits), 1u, 10000u));
+    MaterialStockUseMaterialTargets = sConfigMgr->GetOption<bool>("AuctionHouseBot.MaterialStock.UseMaterialTargets", false);
+    MaterialStockRecipeAwareTargets = sConfigMgr->GetOption<bool>("AuctionHouseBot.MaterialStock.RecipeAwareTargets", true);
+    MaterialStockRespectPlayerListings = sConfigMgr->GetOption<bool>("AuctionHouseBot.MaterialStock.RespectPlayerListings", false);
+    MaterialStockCommon = AhBotStock::Normalize(
+        sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.Common.MinUnits", 40),
+        sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.Common.RefillUnits", 100));
+    MaterialStockRare = AhBotStock::Normalize(
+        sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.Rare.MinUnits", 5),
+        sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.Rare.RefillUnits", 20));
+    MaterialStockOverrides.clear();
+    std::istringstream overrides(sConfigMgr->GetOption<std::string>("AuctionHouseBot.MaterialStock.ItemTargets", ""));
+    std::string record;
+    while (std::getline(overrides, record, ','))
+    {
+        uint32 item = 0;
+        AhBotStock::Policy policy{};
+        if (AhBotStock::ParseOverride(record, item, policy))
+            MaterialStockOverrides[item] = policy;
+        else
+            LOG_WARN("module", "AHBot material stock: invalid ItemTargets record '{}' (expected item:min:refill, 1 <= min <= refill <= 10000)", record);
+    }
+    PricingErrorsEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.MaterialStock.PricingErrors.Enabled", false);
+    PricingErrorsChance = std::min(100u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.PricingErrors.ChancePercent", 5));
+    PricingErrorsCooldown = 60 * std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.PricingErrors.CooldownMinutes", 60), 1u, 1440u);
+    PricingErrorsVendorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.PricingErrors.VendorPercent", 100), 1u, 100u);
+    LargeStacksEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.MaterialStock.LargeStacks.Enabled", false);
+    LargeStacksChance = std::min(100u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.LargeStacks.ChancePercent", 2));
+    LargeStacksCooldown = 60 * std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.LargeStacks.CooldownMinutes", 180), 1u, 1440u);
+    LargeStacksMaxUnits = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.LargeStacks.MaxUnits", 100), 21u, 10000u);
+    SpecialListingsLifetime = 60 * std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.MaterialStock.SpecialListings.LifetimeMinutes", 15), 1u, 1440u);
     MaterialStockExcludedItems.clear();
     ParseNumberListToSet(MaterialStockExcludedItems,
         sConfigMgr->GetOption<std::string>("AuctionHouseBot.MaterialStock.ExcludedItemIDs", ""), "MaterialStock.ExcludedItemIDs");
     StableSellerPrices = sConfigMgr->GetOption<bool>("AuctionHouseBot.Seller.StablePrices", false);
+    if (!StableSellerPrices && (MaterialStockRespectPlayerListings || PricingErrorsEnabled || LargeStacksEnabled))
+        LOG_WARN("module", "AHBot material stock: player protection and special listings need Seller.StablePrices; enable it to activate those features");
     ProgressionPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProgressionPricing.Enabled", false);
     ProgressionBisMultiplier = sConfigMgr->GetOption<float>("AuctionHouseBot.ProgressionPricing.BisMultiplier", 1.5f);
     if (!std::isfinite(ProgressionBisMultiplier) || ProgressionBisMultiplier < 1 || ProgressionBisMultiplier > 10)
