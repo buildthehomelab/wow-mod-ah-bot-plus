@@ -52,6 +52,20 @@ int main()
     assert(!Affordable(201,20,10)); // Reject one copper over reference, without truncation.
     assert(!Affordable(1,0,10) && !Affordable(0,1,10) && !Affordable(10,1,0));
     assert(Affordable(UINT64_MAX,UINT32_MAX,UINT64_MAX));
+    SpecialSupply fresh;
+    assert(!fresh.vendorValueSupply && fresh.largeListings==0);
+    fresh.Observe(11,1,10); // Above-vendor normal queued refill does not suppress errors.
+    assert(!fresh.vendorValueSupply);
+    fresh.Observe(10,1,10); // Regression: queued vendor-valued refill is not in live snapshot yet.
+    assert(fresh.vendorValueSupply);
+    SpecialSupply live;
+    live.Observe(200,20,10);
+    assert(live.vendorValueSupply);
+    live.Observe(10000,100,10); live.Observe(10000,100,10); live.Observe(10000,100,10);
+    assert(live.largeListings==2); // Saturating active event cap.
+    SpecialSupply zero;
+    zero.Observe(0,1,10); zero.Observe(10,1,0);
+    assert(!zero.vendorValueSupply);
     assert(ListingUnits(Kind::Reserve,100,999,20,100)==20);
     assert(ListingUnits(Kind::PricingError,20,5,20,100)==5);
     assert(ListingUnits(Kind::LargeStack,100,999,20,100)==100);
