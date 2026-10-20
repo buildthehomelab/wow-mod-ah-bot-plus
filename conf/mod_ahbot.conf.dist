@@ -78,6 +78,22 @@ AuctionHouseBot.EnableSeller = false
 AuctionHouseBot.ReturnExpiredAuctionItemsToBot = false
 AuctionHouseBot.GUIDs = 0
 AuctionHouseBot.ItemsPerCycle = 150
+
+# Maintain a bot-owned buyout reserve of every tradable consumed profession reagent
+# (including cooking/first aid/enchanting) and vellum in each enabled house.
+# Checked every sell cycle, before random stock, using only unexpired bot buyouts.
+# MinUnits is a quantity, not a listing count; valid range 1..10000 (clamped).
+# Full stacks respect template and ListingStack.MaxStackSize caps. One replenishment
+# listing per deficient material per cycle; ItemsPerCycle still bounds total additions.
+# This reserve may exceed faction MaxItems, which remains the RANDOM stock cap.
+# The dedicated material catalog bypasses random-pool restrictions/DisabledItemIDs;
+# use MaterialStock.ExcludedItemIDs for explicit material exclusions. Bound, missing,
+# temporary and conjured items are always excluded and logged. No player auctions
+# are removed or counted as reserve. Excluded/unpriceable IDs are logged.
+AuctionHouseBot.MaterialStock.Enabled = false
+AuctionHouseBot.MaterialStock.MinUnits = 20
+AuctionHouseBot.MaterialStock.ExcludedItemIDs =
+
 AuctionHouseBot.ListingExpireTimeInSecondsMin = 900
 AuctionHouseBot.ListingExpireTimeInSecondsMax = 86400
 

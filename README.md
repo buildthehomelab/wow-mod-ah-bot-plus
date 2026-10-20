@@ -225,3 +225,38 @@ Buying still follows configured buyer cycles/candidate limits and normal mail de
 is not an instant-sale endpoint. Existing lower-priced bot stock should be refreshed during
 coordinated deployment. Ship the matched RetailAH and RetailProfessions updates so displayed
 offers and BiS craft profits agree with actual buying behavior. No SQL/client patch is needed.
+
+## Crafting material reserves
+
+Enable `AuctionHouseBot.MaterialStock.Enabled` to replenish actual consumed profession
+reagents and enchanting vellum on **each enabled auction house**, independently. The
+catalog comes from the loaded server spell/skill/item stores, so realm recipe overrides
+are included. This covers material ingredients, including vendor reagents, meat, fish,
+gems and intermediate crafts; it does not add every finished craft or every trade-good
+item merely because of its class. Script-only ingredients absent from spell data need
+separate support. Bound/quest-bound, missing, temporary and conjured items are excluded.
+Startup/reload logs show catalog and excluded IDs; failed pricing is logged per house.
+
+`MaterialStock.MinUnits` defaults to 20 (range 1–10000). Each sell cycle scans that
+house's live in-memory auctions once and counts unexpired bot-owned buyout quantities.
+Player asking prices cannot prevent the reserve. Missing materials take priority over
+random stock; a rotating cursor prevents busy or unpriceable materials starving others.
+Each deficient material gets at most one replenishment listing per cycle, up to its
+unit deficit and the template/configured stack cap. Large deficits or unstackable
+materials take several cycles. Total additions still respect `ItemsPerCycle`.
+
+The material reserve can exceed faction `MaxItems`; that setting continues to cap
+random filling, so a house full of duplicates cannot block material coverage. No old
+or player listings are deleted. Existing plentiful material listings count toward the
+reserve; buying or expiry makes stock eligible for replacement on a later sell cycle.
+Neutral remains disabled when its maximum is zero. With cross-faction auctions enabled,
+the core uses the shared house rather than separate faction stocks.
+
+The dedicated material catalog deliberately bypasses exclusions intended for random
+stock (`DisabledItemIDs`, category weights, item levels and no-vendor-price filtering),
+so ordinary recipe ingredients are not silently omitted. Use the separate
+`MaterialStock.ExcludedItemIDs` to intentionally exclude a material. Existing pricing,
+crafting floors and money limits still apply; an unpriceable item is reported and
+skipped instead of sold at an invalid price. Keep stable seller pricing enabled to
+make new reserve prices match addon reference quotes. This is periodic replenishment,
+not an instantaneous or unlimited availability guarantee.
