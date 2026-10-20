@@ -338,3 +338,28 @@ surrounding spaces. Empty, negative, reversed, trailing-junk and overflowing val
 are rejected with a log message and retain the previous valid value (startup default:
 1). Cycle intervals must be positive. Buyer candidates accept `0` or `0:0` to disable
 attempts; mixed zero/positive ranges are rejected.
+
+### Bag seller prices
+
+With crafted pricing enabled, finished crafted bags use their recipe margin floor
+instead of the ordinary container/quality markup. Material replacement references,
+recursive intermediate costs, configured crafting margin and effective auction cut
+remain authoritative; this is a listing-price estimate, not a guaranteed player sale.
+
+Actual gold vendor offers impose a second limit on all container bags: 76% of the
+cheapest vendor purchase price for the same slot count, bag family and subclass.
+This beats a 20% reputation-discounted purchase by another 5%. The comparison uses
+loaded BuyPrice/BuyCount and actual zero-ExtendedCost npc_vendor rows, never SellPrice.
+Token purchases and bags with no actual vendor offer do not create a gold ceiling.
+Specialty bags cannot be treated as ordinary general storage. Vendor accessibility
+is deliberately conservative: faction, limited stock and progression can make a
+particular vendor unavailable to an individual player.
+
+If the material-profit floor exceeds the vendor ceiling, the bot withholds that bag
+from new listings and returns no catalog quote. It never caps below the floor to
+pretend crafting is profitable. Some small cosmetic bags need cheaper ingredients
+or a deliberate premium exception before both goals can be met. Ingredient pricing
+is unchanged by this policy. Unsupported/cyclic bag recipes are also withheld.
+Existing auctions retain their stored prices until expired or explicitly refreshed
+after deployment. Buyer pricing is unchanged. This requires a reviewed module merge,
+an exact merged-commit wow-server pin and a rebuild/restart before taking effect.
