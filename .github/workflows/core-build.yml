@@ -27,6 +27,10 @@ jobs:
           /tmp/catalog-provider-test
           c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/bis_buyer_pricing_test.cpp -o /tmp/bis-buyer-test
           /tmp/bis-buyer-test
+      - name: Check material stock planning
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/material_stock_test.cpp -o /tmp/material-stock-test
+          /tmp/material-stock-test
       - name: Validate published catalog and generated membership
         run: |
           python3 tools/build_bis_header.py --check
