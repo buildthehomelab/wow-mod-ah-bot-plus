@@ -226,37 +226,83 @@ is not an instant-sale endpoint. Existing lower-priced bot stock should be refre
 coordinated deployment. Ship the matched RetailAH and RetailProfessions updates so displayed
 offers and BiS craft profits agree with actual buying behavior. No SQL/client patch is needed.
 
-## Crafting material reserves
+## Crafting material supply
 
-Enable `AuctionHouseBot.MaterialStock.Enabled` to replenish actual consumed profession
-reagents and enchanting vellum on **each enabled auction house**, independently. The
-catalog comes from the loaded server spell/skill/item stores, so realm recipe overrides
-are included. This covers material ingredients, including vendor reagents, meat, fish,
-gems and intermediate crafts; it does not add every finished craft or every trade-good
-item merely because of its class. Script-only ingredients absent from spell data need
-separate support. Bound/quest-bound, missing, temporary and conjured items are excluded.
-Startup/reload logs show catalog and excluded IDs; failed pricing is logged per house.
+`AuctionHouseBot.MaterialStock.Enabled` stocks actual consumed profession ingredients
+and enchanting vellum independently in each enabled house, using loaded server
+spell/skill/item stores. This includes meat, fish, gems, vendor ingredients and
+intermediate crafts. Bound/quest-bound, missing, temporary and conjured items are
+excluded and logged. Script-only ingredients absent from spell metadata need separate
+support. Use `MaterialStock.ExcludedItemIDs` for intentional exclusions: the dedicated
+catalog bypasses restrictions intended for random stock.
 
-`MaterialStock.MinUnits` defaults to 20 (range 1–10000). Each sell cycle scans that
-house's live in-memory auctions once and counts unexpired bot-owned buyout quantities.
-Player asking prices cannot prevent the reserve. Missing materials take priority over
-random stock; a rotating cursor prevents busy or unpriceable materials starving others.
-Each deficient material gets at most one replenishment listing per cycle, up to its
-unit deficit and the template/configured stack cap. Large deficits or unstackable
-materials take several cycles. Total additions still respect `ItemsPerCycle`.
+### Material targets and batch replenishment
 
-The material reserve can exceed faction `MaxItems`; that setting continues to cap
-random filling, so a house full of duplicates cannot block material coverage. No old
-or player listings are deleted. Existing plentiful material listings count toward the
-reserve; buying or expiry makes stock eligible for replacement on a later sell cycle.
-Neutral remains disabled when its maximum is zero. With cross-faction auctions enabled,
-the core uses the shared house rather than separate faction stocks.
+Without material targets, `MinUnits`/`RefillUnits` default to 20/20 for compatibility.
+With `UseMaterialTargets=true`, normal/uncommon ingredients use Common targets
+(default minimum 40, refill 100); rare-or-higher quality ingredients use Rare targets
+(default 5/20). Quality is a starting proxy, not a claim about live demand or scarcity.
+`RecipeAwareTargets=true` raises each minimum to at least the largest quantity of
+that ingredient consumed by a profession spell and each refill target to at least
+twice that quantity. Repeated reagent slots add together. Quantities cap at 10000.
+Explicit `ItemTargets` records (`2589:80:200,12363:5:20`) override calculated targets;
+use item:min:refill with no whitespace, 1<=min<=refill<=10000. Invalid records warn;
+last duplicate wins. Overrides apply only to eligible recipe ingredients/vellum.
 
-The dedicated material catalog deliberately bypasses exclusions intended for random
-stock (`DisabledItemIDs`, category weights, item levels and no-vendor-price filtering),
-so ordinary recipe ingredients are not silently omitted. Use the separate
-`MaterialStock.ExcludedItemIDs` to intentionally exclude a material. Existing pricing,
-crafting floors and money limits still apply; an unpriceable item is reported and
-skipped instead of sold at an invalid price. Keep stable seller pricing enabled to
-make new reserve prices match addon reference quotes. This is periodic replenishment,
-not an instantaneous or unlimited availability guarantee.
+Falling **below** the minimum starts a refill batch. A per-house latch keeps adding
+up to 20 units per material per cycle, respecting lower template/configured caps,
+until the high target is reached. This continues across cycles even after crossing
+the minimum, avoiding a tiny replacement every sale. After reaching the target,
+no batch restarts until below the minimum again. Reload/restart resets batch latches;
+stock between minimum and refill is sufficient until it next drops below minimum.
+A rotating cursor prevents unpriceable or busy materials starving later ingredients.
+
+### Give player sellers room
+
+With `RespectPlayerListings=true` and `Seller.StablePrices=true`, unexpired player
+buyout quantities priced **at or below** the existing stable unit reference count
+alongside bot supply. Exact stack comparison avoids rounding down an overpriced ask.
+The combined quantity reduces the refill deficit; player supply alone reaching the
+minimum cancels an active refill batch. Expensive or bid-only player listings cannot
+block baseline availability. No auction price is copied into the pricing model and
+bots do not reactively undercut player asks. Without stable pricing, player protection
+warns and remains inactive. Existing bot stock is left to sell/expire naturally.
+
+Managed materials are excluded from **all random filling**, including multiplied
+listings, so random stock cannot bypass material targets or player protection. Other
+items retain random filling. The faction MaxItems remains the random-stock cap;
+bounded material reserves can exceed it if a house full of duplicates would otherwise
+block ingredients. All additions share ItemsPerCycle, with normal deficits first.
+Neutral remains disabled when its maximum is zero. Shared cross-faction houses require
+the existing corresponding shared-house configuration rather than separate stocks.
+
+### Occasional discoveries
+
+Opt-in `MaterialStock.PricingErrors.Enabled` occasionally lists **one** random material
+stack at the NPC **sell** value per unit. `VendorPercent=100` means exactly that value;
+1..99 permits lower prices, rounded to at least 1 copper. No-vendor-value materials are
+excluded. This deliberate listing-only exception bypasses recipe floors; normal shared
+reference quotes and buyer valuations remain unchanged. The default is a 5% chance per
+eligible sell cycle after a 60-minute per-house cooldown, with at most one live
+vendor-value-or-less bot material listing. Bargain stacks contain at most20 units and
+respect lower configured/template stack limits.
+
+Opt-in `MaterialStock.LargeStacks.Enabled` occasionally creates **one or two** random
+material listings with 21..100 units at normal stable prices and crafting floors.
+Default chance is 2% after a 180-minute per-house cooldown; at most two oversized bot
+material listings may be live in a house. `MaxUnits` controls the upper size. These
+explicitly bypass the ordinary AH listing cap of 20, but never the loaded item template
+or auction money limits. A stack-size module can make those larger templates available;
+items that cannot stack beyond 20 never produce oversized listings.
+
+Both events avoid any ingredient with an active player buyout, require stable prices,
+wait behind normal replenishment, and default to 15-minute listings. Their cooldowns
+start with an initial delay after restart and survive config reload. Active vendor-value
+or oversized bot stock is recognized conservatively after restart, so legacy supply
+can postpone new events. Special stock counts in later supply checks and can temporarily
+exceed a material's normal refill target. No existing auctions are deleted or repriced.
+"Pricing error" is used in config/logs; item names and auction UI labels stay unchanged.
+
+These are periodic supply rules, not an instantaneous unlimited availability guarantee.
+No SQL, client patch or addon update is required. Build/restart and in-game verification
+remain deployment steps; inspect logs and live faction stock after deployment.
