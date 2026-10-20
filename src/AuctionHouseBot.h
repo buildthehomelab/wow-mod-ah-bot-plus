@@ -28,6 +28,7 @@
 #include "AuctionHouseBotPriceCatalog.h"
 
 #include <map>
+#include <ctime>
 #include <vector>
 
 struct AuctionEntry;
@@ -354,6 +355,26 @@ private:
 
     bool MaterialStockEnabled = false;
     uint32 MaterialStockMinUnits = 20;
+    uint32 MaterialStockRefillUnits = 20;
+    bool MaterialStockUseMaterialTargets = false;
+    bool MaterialStockRecipeAwareTargets = true;
+    bool MaterialStockRespectPlayerListings = false;
+    AhBotStock::Policy MaterialStockCommon{40, 100};
+    AhBotStock::Policy MaterialStockRare{5, 20};
+    std::map<uint32, AhBotStock::Policy> MaterialStockPolicies;
+    std::map<uint32, AhBotStock::Policy> MaterialStockOverrides;
+    std::map<uint32, std::set<uint32>> MaterialStockRefilling;
+    bool PricingErrorsEnabled = false;
+    uint32 PricingErrorsChance = 5;
+    uint32 PricingErrorsCooldown = 3600;
+    uint32 PricingErrorsVendorPercent = 100;
+    bool LargeStacksEnabled = false;
+    uint32 LargeStacksChance = 2;
+    uint32 LargeStacksCooldown = 10800;
+    uint32 LargeStacksMaxUnits = 100;
+    uint32 SpecialListingsLifetime = 900;
+    std::map<uint32, std::time_t> NextPricingError;
+    std::map<uint32, std::time_t> NextLargeStacks;
     std::vector<uint32> MaterialStockItems;
     std::set<uint32> MaterialStockExcludedItems;
     std::map<uint32, std::size_t> MaterialStockCursors;
