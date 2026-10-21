@@ -322,6 +322,17 @@ void AuctionHouseBot::CalculateItemValue(ItemTemplate const* itemProto, uint64& 
         }
     }
 
+    // Mounts are a fixed gold sink per riding tier. Seller and buyer share it, so a bot
+    // mount can never be resold to the buyer for more than it cost.
+    if (MountPricingEnabled && itemProto->Class == ITEM_CLASS_MISC && itemProto->SubClass == ITEM_SUBCLASS_JUNK_MOUNT)
+    {
+        bool riding = !itemProto->RequiredSkill || itemProto->RequiredSkill == SKILL_RIDING;
+        uint64 price = MountPrices[AhBotPricing::MountTier(itemProto->RequiredSkillRank, riding)];
+        outBuyoutPrice = priceRange(price * (1.0f - BuyoutVariationReducePercent), price * (1.0f + BuyoutVariationAddPercent));
+        outBidPrice = priceRange((1.0f - BidVariationLowReducePercent) * outBuyoutPrice, (1.0f - BidVariationHighReducePercent) * outBuyoutPrice);
+        return;
+    }
+
 
     // Start with a buyout price related to the sell price, if configured
     if (UseItemSellPriceIfHigherThanPriceMinimumCenterBase == true)
@@ -898,6 +909,25 @@ void AuctionHouseBot::PopulateCraftedPricing()
         }
     }
 
+    // Glyph item -> minor, from the glyph its spell applies.
+    GlyphIsMinor.clear();
+    if (GlyphPricingEnabled)
+        for (auto const& [id, glyph] : *sObjectMgr->GetItemTemplateStore())
+        {
+            if (glyph.Class != ITEM_CLASS_GLYPH)
+                continue;
+            for (auto const& itemSpell : glyph.Spells)
+            {
+                SpellInfo const* spell = itemSpell.SpellId > 0 ? sSpellMgr->GetSpellInfo(itemSpell.SpellId) : nullptr;
+                if (!spell)
+                    continue;
+                for (auto const& effect : spell->Effects)
+                    if (effect.Effect == SPELL_EFFECT_APPLY_GLYPH)
+                        if (auto properties = sGlyphPropertiesStore.LookupEntry(effect.MiscValue))
+                            GlyphIsMinor[id] = properties->TypeFlags & 1;
+            }
+        }
+
     if (ProgressionPricingEnabled)
         for (auto const& entry : AhBotPricing::ProgressionBis)
             if (sObjectMgr->GetItemTemplate(entry.item))
@@ -909,7 +939,7 @@ void AuctionHouseBot::PopulateCraftedPricing()
         CalculateItemValue(proto, bid, buyout, true);
         item.independentSupply = independentlySupplied.count(id) != 0;
         item.vendor = proto->SellPrice;
-        item.quote = std::max<uint64>(buyout, proto->SellPrice);
+        item.quote = std::max<double>(std::max<uint64>(buyout, proto->SellPrice), GetCategoryFloor(proto));
         if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(id))
             item.demandMultiplier = ProgressionBisMultiplier;
         if (!CraftedPricingEnabled)
@@ -943,6 +973,7 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
     }
     if (!it->second.IsValid())
         return false;
+    AhBotPricing::RaiseToFloor(GetCategoryFloor(proto), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
     if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(proto->ItemId))
     {
         double cap = std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX);
@@ -976,6 +1007,24 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
             proto->SellPrice, cut, std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
     }
     return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+}
+
+// Seller-only minimum unit price for epic gear, glyphs and ammo; 0 when none applies.
+double AuctionHouseBot::GetCategoryFloor(ItemTemplate const* proto) const
+{
+    if (EpicGearFloorEnabled && proto->Quality == ITEM_QUALITY_EPIC
+        && (proto->Class == ITEM_CLASS_ARMOR || proto->Class == ITEM_CLASS_WEAPON))
+        return AhBotPricing::EpicGearFloor(proto->ItemLevel, EpicGearFloorGold * 10000.0, EpicGearFloorItemLevel, EpicGearFloorExponent);
+    if (GlyphPricingEnabled && proto->Class == ITEM_CLASS_GLYPH)
+    {
+        auto glyph = GlyphIsMinor.find(proto->ItemId);
+        if (glyph != GlyphIsMinor.end())
+            return (glyph->second ? GlyphPricingMinorGold : GlyphPricingMajorGold) * 10000.0;
+    }
+    // Ammo never undercuts its NPC purchase price.
+    if (ProjectilePricingEnabled && proto->Class == ITEM_CLASS_PROJECTILE && proto->BuyPrice)
+        return double(proto->BuyPrice) / std::max<uint32>(1, proto->BuyCount);
+    return 0;
 }
 
 bool AuctionHouseBot::GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer)
@@ -2767,6 +2816,24 @@ void AuctionHouseBot::InitializeConfiguration()
     RecipePricingBisPercent = std::min(1000u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.RecipePricing.BisProducedItemPercent", 100));
     if (RecipePricingEnabled && !CraftedPricingEnabled && !ProgressionPricingEnabled && !StableSellerPrices)
         LOG_WARN("module", "AuctionHouseBot: RecipePricing needs CraftedPricing, ProgressionPricing or Seller.StablePrices enabled");
+    MountPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.MountPricing.Enabled", false);
+    char const* mountTiers[] = {"Apprentice", "Journeyman", "Expert", "Artisan"};
+    uint32 mountDefaults[] = {500, 5000, 7500, 15000};
+    for (size_t tier = 0; tier < MountPrices.size(); ++tier)
+        MountPrices[tier] = uint64(std::clamp(sConfigMgr->GetOption<uint32>(
+            std::string("AuctionHouseBot.MountPricing.") + mountTiers[tier] + "Gold", mountDefaults[tier]), 1u, 200000u)) * 10000;
+    EpicGearFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.EpicGearFloor.Enabled", false);
+    EpicGearFloorGold = sConfigMgr->GetOption<float>("AuctionHouseBot.EpicGearFloor.Gold", 100);
+    if (!std::isfinite(EpicGearFloorGold) || EpicGearFloorGold < 0 || EpicGearFloorGold > 100000)
+        EpicGearFloorGold = 100;
+    EpicGearFloorItemLevel = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.EpicGearFloor.ItemLevel", 66), 1u, 1000u);
+    EpicGearFloorExponent = sConfigMgr->GetOption<float>("AuctionHouseBot.EpicGearFloor.Exponent", 3);
+    if (!std::isfinite(EpicGearFloorExponent) || EpicGearFloorExponent < 0 || EpicGearFloorExponent > 6)
+        EpicGearFloorExponent = 3;
+    GlyphPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.GlyphPricing.Enabled", false);
+    GlyphPricingMajorGold = std::clamp(sConfigMgr->GetOption<float>("AuctionHouseBot.GlyphPricing.MajorGold", 20), 0.0f, 10000.0f);
+    GlyphPricingMinorGold = std::clamp(sConfigMgr->GetOption<float>("AuctionHouseBot.GlyphPricing.MinorGold", 5), 0.0f, 10000.0f);
+    ProjectilePricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProjectilePricing.Enabled", false);
     CraftedPricingReady = false;
     CraftedPricingModels.clear();
 

@@ -146,6 +146,26 @@ c++ -std=c++17 -Wall -Wextra -Werror tests/recipe_pricing_test.cpp -o /tmp/recip
 /tmp/recipe-pricing-test
 ```
 
+### Mounts, epic gear, glyphs and ammo
+
+Each is off by default; see `conf/mod_ahbot.conf.dist` for the keys.
+
+- `MountPricing`: a fixed gold-sink price per riding tier (75/150/225/300), shared by
+  seller and buyer so a bot mount can't be flipped to the buyer. Crafted mounts keep
+  their crafting floor.
+- `EpicGearFloor`: epic armor and weapons list for at least
+  `Gold * (ItemLevel / ItemLevel_ref) ^ Exponent` (100g at item level 66 by default).
+- `GlyphPricing`: separate minimums for major and minor glyphs.
+- `ProjectilePricing`: ammo never lists below its NPC purchase price per unit.
+
+The last three only raise the seller's quote and feed recipe pricing through the crafted
+reference. TCG/promo items are best kept off the AH with `DisabledCustomItemIDs`.
+
+```sh
+c++ -std=c++17 -Wall -Wextra -Werror tests/floor_pricing_test.cpp -o /tmp/floor-pricing-test
+/tmp/floor-pricing-test
+```
+
 ## Progression BiS demand
 
 `AuctionHouseBot.ProgressionPricing.Enabled = true` applies a configurable premium
