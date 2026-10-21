@@ -909,6 +909,47 @@ void AuctionHouseBot::PopulateCraftedPricing()
         }
     }
 
+    // NPC gold purchase price per unit, for the vendor floor. Bags keep their own pricing.
+    VendorPurchasePrices.clear();
+    if (VendorPriceFloorEnabled)
+    {
+        QueryResult vendors = WorldDatabase.Query("SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0");
+        if (vendors)
+        {
+            do
+            {
+                auto sold = sObjectMgr->GetItemTemplate(vendors->Fetch()[0].Get<uint32>());
+                if (sold && sold->BuyPrice && !(sold->Class == ITEM_CLASS_CONTAINER && sold->ContainerSlots))
+                    VendorPurchasePrices[sold->ItemId] = double(sold->BuyPrice) / std::max<uint32>(1, sold->BuyCount);
+            } while (vendors->NextRow());
+        }
+    }
+
+    // Expected disenchant materials per DisenchantID; the materials join the price model.
+    DisenchantYields.clear();
+    if (DisenchantFloorEnabled)
+    {
+        std::map<uint32, std::vector<AhBotPricing::DropRow>> tables;
+        QueryResult loot = WorldDatabase.Query(
+            "SELECT Entry, Item, Chance, GroupId, MinCount, MaxCount FROM disenchant_loot_template WHERE Reference = 0");
+        if (loot)
+        {
+            do
+            {
+                Field* fields = loot->Fetch();
+                tables[fields[0].Get<uint32>()].push_back({fields[1].Get<uint32>(), fields[2].Get<float>(),
+                    fields[3].Get<uint8>(), fields[4].Get<uint8>(), fields[5].Get<uint8>()});
+            } while (loot->NextRow());
+        }
+        for (auto const& [entry, rows] : tables)
+            for (auto const& [material, count] : AhBotPricing::ExpectedDrops(rows))
+                if (sObjectMgr->GetItemTemplate(material))
+                {
+                    DisenchantYields[entry].emplace_back(material, count);
+                    model.items.try_emplace(material);
+                }
+    }
+
     // Glyph item -> minor, from the glyph its spell applies.
     GlyphIsMinor.clear();
     if (GlyphPricingEnabled)
@@ -973,7 +1014,20 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
     }
     if (!it->second.IsValid())
         return false;
-    AhBotPricing::RaiseToFloor(GetCategoryFloor(proto), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+    double minimum = GetCategoryFloor(proto);
+    // Never cheaper than buying from an NPC, or than what it disenchants into.
+    auto npc = VendorPurchasePrices.find(proto->ItemId);
+    if (npc != VendorPurchasePrices.end())
+        minimum = std::max(minimum, npc->second * VendorPriceFloorPercent / 100);
+    auto yields = proto->DisenchantID ? DisenchantYields.find(proto->DisenchantID) : DisenchantYields.end();
+    if (yields != DisenchantYields.end())
+    {
+        double value = 0;
+        for (auto const& [material, count] : yields->second)
+            value += it->second.Get(material).reference * count;
+        minimum = std::max(minimum, value * DisenchantFloorPercent / 100);
+    }
+    AhBotPricing::RaiseToFloor(minimum, std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
     if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(proto->ItemId))
     {
         double cap = std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX);
@@ -1413,7 +1467,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
             itr->second.Name1.find("D'Sak") != std::string::npos ||
             itr->second.Name1.find("(") != std::string::npos ||
             itr->second.Name1.find("OLD") != std::string::npos ||
-            itr->second.Name1.find("PVP") != std::string::npos))
+            itr->second.Name1.find("PVP") != std::string::npos ||
+            AhBotPricing::IsPlaceholderName(itr->second.Name1)))
         {
             if (debug_Out_Filters)
                 LOG_ERROR("module", "AuctionHouseBot: Item {} disabled item with a temp or unused item name", itr->second.ItemId);
@@ -2834,6 +2889,10 @@ void AuctionHouseBot::InitializeConfiguration()
     GlyphPricingMajorGold = std::clamp(sConfigMgr->GetOption<float>("AuctionHouseBot.GlyphPricing.MajorGold", 20), 0.0f, 10000.0f);
     GlyphPricingMinorGold = std::clamp(sConfigMgr->GetOption<float>("AuctionHouseBot.GlyphPricing.MinorGold", 5), 0.0f, 10000.0f);
     ProjectilePricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProjectilePricing.Enabled", false);
+    VendorPriceFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.VendorPriceFloor.Enabled", false);
+    VendorPriceFloorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.VendorPriceFloor.Percent", 100), 1u, 1000u);
+    DisenchantFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.DisenchantFloor.Enabled", false);
+    DisenchantFloorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.DisenchantFloor.Percent", 100), 1u, 1000u);
     CraftedPricingReady = false;
     CraftedPricingModels.clear();
 
