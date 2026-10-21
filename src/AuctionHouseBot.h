@@ -167,6 +167,13 @@ private:
     float GlyphPricingMinorGold = 5;
     std::unordered_map<uint32, bool> GlyphIsMinor;
     bool ProjectilePricingEnabled = false;
+    bool VendorPriceFloorEnabled = false;
+    uint32 VendorPriceFloorPercent = 100;
+    std::unordered_map<uint32, double> VendorPurchasePrices;
+    bool DisenchantFloorEnabled = false;
+    uint32 DisenchantFloorPercent = 100;
+    // DisenchantID -> (material, expected units per disenchant).
+    std::unordered_map<uint32, std::vector<std::pair<uint32, double>>> DisenchantYields;
     double GetCategoryFloor(ItemTemplate const* proto) const;
     void PopulateCraftedPricing();
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);

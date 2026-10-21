@@ -146,7 +146,7 @@ c++ -std=c++17 -Wall -Wextra -Werror tests/recipe_pricing_test.cpp -o /tmp/recip
 /tmp/recipe-pricing-test
 ```
 
-### Mounts, epic gear, glyphs and ammo
+### Mounts, epic gear, glyphs, ammo, vendor and disenchant floors
 
 Each is off by default; see `conf/mod_ahbot.conf.dist` for the keys.
 
@@ -157,9 +157,13 @@ Each is off by default; see `conf/mod_ahbot.conf.dist` for the keys.
   `Gold * (ItemLevel / ItemLevel_ref) ^ Exponent` (100g at item level 66 by default).
 - `GlyphPricing`: separate minimums for major and minor glyphs.
 - `ProjectilePricing`: ammo never lists below its NPC purchase price per unit.
+- `VendorPriceFloor`: anything an NPC sells for gold never lists below that NPC price
+  (bags excepted), so the AH doesn't undercut vendor gold sinks.
+- `DisenchantFloor`: disenchantable gear never lists below the expected value of its
+  disenchant materials at the bot's own prices.
 
-The last three only raise the seller's quote and feed recipe pricing through the crafted
-reference. TCG/promo items are best kept off the AH with `DisabledCustomItemIDs`.
+All but `MountPricing` only raise the seller's quote. The epic gear, glyph and ammo floors
+also feed recipe pricing through the crafted reference. TCG/promo items are best kept off the AH with `DisabledCustomItemIDs`.
 
 ```sh
 c++ -std=c++17 -Wall -Wextra -Werror tests/floor_pricing_test.cpp -o /tmp/floor-pricing-test

@@ -1093,7 +1093,9 @@ AuctionHouseBot.ListedItemIDRestrict.ExceptionItemIDs =
 
 ###############################################################################
 #    AuctionHouseBot.DisabledItemTextFilter
-#        If true, the seller bot won't list items with bad names like "OLD" and "D'Sak"
+#        If true, the seller bot won't list items with bad names like "OLD" and "D'Sak",
+#        or developer placeholders ("Unused ...", "Durability ...", "Monster - ...",
+#        "90 Green Warrior Axe", "Red Leather C03 Boots")
 #    Default: true
 #
 #    AuctionHouseBot.DisabledRecipeProducedItemFilterEnabled
@@ -1201,6 +1203,18 @@ AuctionHouseBot.GlyphPricing.MinorGold = 5
 # Ammo never lists below its NPC purchase price per unit (item BuyPrice / BuyCount).
 # Only raises. Seller only.
 AuctionHouseBot.ProjectilePricing.Enabled = false
+
+# Items an NPC sells for gold (any npc_vendor row with ExtendedCost 0) never list below
+# Percent of that NPC price per unit (item BuyPrice / BuyCount), so the AH doesn't undercut
+# vendor gold sinks. Bags keep their own vendor-aware pricing. Only raises. Seller only.
+AuctionHouseBot.VendorPriceFloor.Enabled = false
+AuctionHouseBot.VendorPriceFloor.Percent = 100
+
+# Disenchantable items never list below Percent of the expected value of their disenchant
+# materials (disenchant_loot_template chances x the bot's own material reference prices),
+# so buying from the bot to disenchant is never profitable. Only raises. Seller only.
+AuctionHouseBot.DisenchantFloor.Enabled = false
+AuctionHouseBot.DisenchantFloor.Percent = 100
 
 # Use one deterministic upper configured unit quote instead of rolling listing prices.
 # Alliance and Horde get identical new per-unit prices; stack quantities may differ.
