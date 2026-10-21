@@ -26,6 +26,7 @@
 #include "CraftingPricing.h"
 #include "BagPricing.h"
 #include "RecipePricing.h"
+#include <array>
 #include <tuple>
 #include "MaterialStock.h"
 #include "AuctionHouseBotPriceCatalog.h"
@@ -155,6 +156,18 @@ private:
     // Recipe item -> (crafted item, guaranteed units per craft).
     std::unordered_map<uint32, std::pair<uint32, uint32>> RecipeOutputs;
     std::unordered_map<uint32, double> VendorRecipePurchasePrices;
+    bool MountPricingEnabled = false;
+    std::array<uint64, 4> MountPrices = {5000000, 50000000, 75000000, 150000000};
+    bool EpicGearFloorEnabled = false;
+    float EpicGearFloorGold = 100;
+    uint32 EpicGearFloorItemLevel = 66;
+    float EpicGearFloorExponent = 3;
+    bool GlyphPricingEnabled = false;
+    float GlyphPricingMajorGold = 20;
+    float GlyphPricingMinorGold = 5;
+    std::unordered_map<uint32, bool> GlyphIsMinor;
+    bool ProjectilePricingEnabled = false;
+    double GetCategoryFloor(ItemTemplate const* proto) const;
     void PopulateCraftedPricing();
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;

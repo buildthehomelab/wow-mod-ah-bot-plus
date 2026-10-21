@@ -1172,6 +1172,36 @@ AuctionHouseBot.RecipePricing.ProducedItemPercent = 50
 # For recipes whose item is in the progression BiS catalog.
 AuctionHouseBot.RecipePricing.BisProducedItemPercent = 100
 
+# Mounts as a fixed gold sink, by the riding skill they need: 75 Apprentice, 150 Journeyman,
+# 225 Expert, 300 Artisan. Profession-gated mounts (engineering flying machines 300/375)
+# count one tier lower. Replaces the category formula, ±the usual variation, and the buyer
+# uses the same price, so a bot mount cannot be resold to the buyer at a profit. A crafted
+# mount still lists at least at its crafting floor. Gold, 1..200000.
+AuctionHouseBot.MountPricing.Enabled = false
+AuctionHouseBot.MountPricing.ApprenticeGold = 500
+AuctionHouseBot.MountPricing.JourneymanGold = 5000
+AuctionHouseBot.MountPricing.ExpertGold = 7500
+AuctionHouseBot.MountPricing.ArtisanGold = 15000
+
+# Minimum seller price for epic armor and weapons:
+# Gold * (ItemLevel / EpicGearFloor.ItemLevel) ^ Exponent. Defaults: 100g at item level 66
+# (Tier 1 belts), ~180g at 80, ~1000g at 141, ~2800g at 200. Only raises; BiS premium and
+# crafting floors still apply on top. Seller only.
+AuctionHouseBot.EpicGearFloor.Enabled = false
+AuctionHouseBot.EpicGearFloor.Gold = 100
+AuctionHouseBot.EpicGearFloor.ItemLevel = 66
+AuctionHouseBot.EpicGearFloor.Exponent = 3
+
+# Minimum seller price for glyphs, by the glyph they apply (major or minor). Only raises.
+# Seller only. Gold.
+AuctionHouseBot.GlyphPricing.Enabled = false
+AuctionHouseBot.GlyphPricing.MajorGold = 20
+AuctionHouseBot.GlyphPricing.MinorGold = 5
+
+# Ammo never lists below its NPC purchase price per unit (item BuyPrice / BuyCount).
+# Only raises. Seller only.
+AuctionHouseBot.ProjectilePricing.Enabled = false
+
 # Use one deterministic upper configured unit quote instead of rolling listing prices.
 # Alliance and Horde get identical new per-unit prices; stack quantities may differ.
 # Crafted/progression floors still apply, using the higher faction fee for both houses.

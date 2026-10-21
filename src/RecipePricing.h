@@ -1,9 +1,7 @@
 #ifndef AH_BOT_RECIPE_PRICING_H
 #define AH_BOT_RECIPE_PRICING_H
 
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
+#include "FloorPricing.h"
 
 namespace AhBotPricing
 {
@@ -19,12 +17,7 @@ inline void ApplyRecipePrice(double produced, std::uint32_t percent, double vend
     double floor = std::ceil(produced * percent / 100);
     if (vendorPurchase > 0)
         floor = std::min(floor, std::floor(vendorPurchase));
-    floor = std::min(floor, static_cast<double>(cap));
-    if (floor <= static_cast<double>(buyout))
-        return;
-    double ratio = buyout ? std::min(1.0, static_cast<double>(bid) / buyout) : 1.0;
-    buyout = static_cast<std::uint64_t>(floor);
-    bid = std::max<std::uint64_t>(1, static_cast<std::uint64_t>(std::ceil(floor * ratio)));
+    RaiseToFloor(floor, cap, bid, buyout);
 }
 }
 #endif
