@@ -25,6 +25,7 @@
 #include "ObjectGuid.h"
 #include "CraftingPricing.h"
 #include "BagPricing.h"
+#include "RecipePricing.h"
 #include <tuple>
 #include "MaterialStock.h"
 #include "AuctionHouseBotPriceCatalog.h"
@@ -148,6 +149,12 @@ private:
     bool CraftedPricingReady = false;
     std::map<double, AhBotPricing::Model> CraftedPricingModels;
     std::map<std::tuple<uint32, uint32, uint32>, double> VendorBagPurchasePrices;
+    bool RecipePricingEnabled = false;
+    uint32 RecipePricingPercent = 50;
+    uint32 RecipePricingBisPercent = 100;
+    // Recipe item -> (crafted item, guaranteed units per craft).
+    std::unordered_map<uint32, std::pair<uint32, uint32>> RecipeOutputs;
+    std::unordered_map<uint32, double> VendorRecipePurchasePrices;
     void PopulateCraftedPricing();
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;

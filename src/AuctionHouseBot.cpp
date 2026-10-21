@@ -852,6 +852,52 @@ void AuctionHouseBot::PopulateCraftedPricing()
                 independentlySupplied.insert(id);
     }
 
+    // Recipe items follow the item they teach. Formulas teach enchants, so they follow the scroll.
+    RecipeOutputs.clear();
+    VendorRecipePurchasePrices.clear();
+    if (RecipePricingEnabled)
+    {
+        for (auto const& [id, recipeItem] : *sObjectMgr->GetItemTemplateStore())
+        {
+            if (recipeItem.Class != ITEM_CLASS_RECIPE)
+                continue;
+            for (auto const& itemSpell : recipeItem.Spells)
+            {
+                SpellInfo const* spell = itemSpell.SpellId > 0 ? sSpellMgr->GetSpellInfo(itemSpell.SpellId) : nullptr;
+                if (!spell || RecipeOutputs.count(id))
+                    continue;
+                for (auto const& effect : spell->Effects)
+                {
+                    bool scroll = effect.Effect == SPELL_EFFECT_ENCHANT_ITEM;
+                    if ((effect.Effect != SPELL_EFFECT_CREATE_ITEM && !scroll) || !effect.ItemType)
+                        continue;
+                    ItemTemplate const* output = sObjectMgr->GetItemTemplate(effect.ItemType);
+                    if (!output)
+                        continue;
+                    if (scroll && std::none_of(std::begin(output->Spells), std::end(output->Spells),
+                        [spell](auto const& s) { return s.SpellId == int32(spell->Id); }))
+                        continue;
+                    RecipeOutputs[id] = {output->ItemId, AhBotPricing::GuaranteedOutput(scroll, effect.BasePoints,
+                        effect.DieSides, output->GetMaxStackSize())};
+                    model.items.try_emplace(output->ItemId);
+                    break;
+                }
+            }
+        }
+        // Only open gold offers: no reputation, no limited stock, no token cost.
+        QueryResult recipeVendors = WorldDatabase.Query(
+            "SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0 AND maxcount = 0");
+        if (recipeVendors)
+        {
+            do
+            {
+                auto recipe = sObjectMgr->GetItemTemplate(recipeVendors->Fetch()[0].Get<uint32>());
+                if (recipe && recipe->Class == ITEM_CLASS_RECIPE && recipe->BuyPrice && !recipe->RequiredReputationFaction)
+                    VendorRecipePurchasePrices[recipe->ItemId] = double(recipe->BuyPrice) / std::max<uint32>(1, recipe->BuyCount);
+            } while (recipeVendors->NextRow());
+        }
+    }
+
     if (ProgressionPricingEnabled)
         for (auto const& entry : AhBotPricing::ProgressionBis)
             if (sObjectMgr->GetItemTemplate(entry.item))
@@ -904,6 +950,19 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
             return false;
         buyout = uint64(std::ceil(buyout * double(ProgressionBisMultiplier)));
         bid = uint64(std::ceil(bid * double(ProgressionBisMultiplier)));
+    }
+    if (RecipePricingEnabled && proto->Class == ITEM_CLASS_RECIPE)
+    {
+        auto output = RecipeOutputs.find(proto->ItemId);
+        if (output != RecipeOutputs.end())
+        {
+            auto [item, count] = output->second;
+            uint32 percent = AhBotPricing::IsProgressionBis(item) ? RecipePricingBisPercent : RecipePricingPercent;
+            auto vendor = VendorRecipePurchasePrices.find(proto->ItemId);
+            AhBotPricing::ApplyRecipePrice(it->second.Get(item).reference * count, percent,
+                vendor == VendorRecipePurchasePrices.end() ? 0 : vendor->second,
+                std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+        }
     }
     if (CraftedPricingEnabled && proto->Class == ITEM_CLASS_CONTAINER && proto->ContainerSlots)
     {
@@ -2703,6 +2762,11 @@ void AuctionHouseBot::InitializeConfiguration()
     CraftedPricingMargin = sConfigMgr->GetOption<float>("AuctionHouseBot.CraftedPricing.ProfitMargin", 0.15f);
     if (!std::isfinite(CraftedPricingMargin) || CraftedPricingMargin < 0 || CraftedPricingMargin > 10)
         CraftedPricingMargin = 0.15f;
+    RecipePricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.RecipePricing.Enabled", false);
+    RecipePricingPercent = std::min(1000u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.RecipePricing.ProducedItemPercent", 50));
+    RecipePricingBisPercent = std::min(1000u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.RecipePricing.BisProducedItemPercent", 100));
+    if (RecipePricingEnabled && !CraftedPricingEnabled && !ProgressionPricingEnabled && !StableSellerPrices)
+        LOG_WARN("module", "AuctionHouseBot: RecipePricing needs CraftedPricing, ProgressionPricing or Seller.StablePrices enabled");
     CraftedPricingReady = false;
     CraftedPricingModels.clear();
 

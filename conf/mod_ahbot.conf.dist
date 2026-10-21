@@ -1160,6 +1160,18 @@ AuctionHouseBot.ProgressionPricing.Enabled = false
 # 1.5 = 50% premium. Valid range 1..10; invalid values fall back to 1.5.
 AuctionHouseBot.ProgressionPricing.BisMultiplier = 1.5
 
+# Recipe items (patterns, plans, formulas...) priced from what they teach. A recipe lists
+# for at least this percent of one craft's seller reference (crafted floor and BiS premium
+# included); formulas follow their enchant scroll. Only raises the ordinary quote.
+# Recipes anyone can buy from an NPC for gold (no reputation, unlimited stock) never go
+# above that NPC price. Seller only. Needs CraftedPricing, ProgressionPricing or
+# Seller.StablePrices enabled.
+AuctionHouseBot.RecipePricing.Enabled = false
+# 0..1000; 0 turns that half off.
+AuctionHouseBot.RecipePricing.ProducedItemPercent = 50
+# For recipes whose item is in the progression BiS catalog.
+AuctionHouseBot.RecipePricing.BisProducedItemPercent = 100
+
 # Use one deterministic upper configured unit quote instead of rolling listing prices.
 # Alliance and Horde get identical new per-unit prices; stack quantities may differ.
 # Crafted/progression floors still apply, using the higher faction fee for both houses.
