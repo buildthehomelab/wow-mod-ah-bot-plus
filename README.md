@@ -128,6 +128,24 @@ output, regardless of enchant bonus points. This closes the ordinary create-item
 scan's omission of enchanting scrolls. It does not independently raise raw material
 prices or change buyer payouts.
 
+### Recipe items
+
+With `AuctionHouseBot.RecipePricing.Enabled`, a recipe item (pattern, plans, formula,
+schematic...) lists for at least `ProducedItemPercent` (default 50) of one craft's
+seller reference: the crafted item's recipe-aware quote, BiS premium included, times
+its guaranteed output. Recipes for items in the progression BiS catalog use
+`BisProducedItemPercent` (default 100), so a raid BiS pattern costs about as much as
+the item it makes. Formulas follow their enchant scroll. This only raises the ordinary
+recipe quote. A recipe anyone can buy from an NPC for gold (no reputation requirement,
+unlimited stock, no token cost) never goes above that NPC price. Seller only; it runs
+on the same seller path as crafted pricing, so it needs CraftedPricing,
+ProgressionPricing or Seller.StablePrices enabled.
+
+```sh
+c++ -std=c++17 -Wall -Wextra -Werror tests/recipe_pricing_test.cpp -o /tmp/recipe-pricing-test
+/tmp/recipe-pricing-test
+```
+
 ## Progression BiS demand
 
 `AuctionHouseBot.ProgressionPricing.Enabled = true` applies a configurable premium

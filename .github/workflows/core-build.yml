@@ -35,6 +35,10 @@ jobs:
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/bag_pricing_test.cpp -o /tmp/bag-pricing-test
           /tmp/bag-pricing-test
+      - name: Check recipe pricing
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/recipe_pricing_test.cpp -o /tmp/recipe-pricing-test
+          /tmp/recipe-pricing-test
       - name: Check material stock planning
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/material_stock_test.cpp -o /tmp/material-stock-test
