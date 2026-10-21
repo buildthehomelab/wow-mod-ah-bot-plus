@@ -1687,6 +1687,12 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
     uint32 newItemsToListCount = std::max(randomBudget, uint32(stockRequests.size()));
     if (!newItemsToListCount)
         return;
+    // Copies of each item already in this house, so small class/quality buckets
+    // (one Fish Scale, two keys, one epic bag) can't fill the house with duplicates.
+    std::unordered_map<uint32, uint32> listedCopies;
+    if (MaxListingsPerItem && randomBudget)
+        for (auto const& [id, auction] : auctionHouse->GetAuctions())
+            ++listedCopies[auction->item_template];
     std::size_t stockIndex = 0;
     uint32 attempts = 0;
     uint32 maxAttempts = newItemsToListCount + 500;
@@ -1790,6 +1796,15 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                     if (debug_Out)
                         LOG_INFO("module", "AHSeller: Is listing item ID {} which is configured for {} multiples from ListMultipliedItemIDs", itemID, ItemListProportionMultipliedItemIDs[itemID]);
                 }
+            }
+
+            // Random filling stops at the per-item cap; reserve refills keep their own targets.
+            if (!stockDeficit && MaxListingsPerItem && listedCopies[itemID] >= MaxListingsPerItem)
+            {
+                ActiveListMultipleItemID = 0;
+                RemainingListMultipleCount = 0;
+                batchCount++;
+                continue;
             }
 
             // Managed ingredients must only enter through reserve planning; random filling
@@ -1910,6 +1925,8 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 NextLargeStacks[config->GetAHID()] = time(nullptr) + LargeStacksCooldown;
                 LOG_INFO("module", "AHBot large stack: house {} item {} units {}", config->GetAHID(), itemID, stackCount);
             }
+            if (MaxListingsPerItem)
+                ++listedCopies[itemID];
             itemsGenerated++;
             batchCount++;
         }
@@ -2889,6 +2906,7 @@ void AuctionHouseBot::InitializeConfiguration()
     GlyphPricingMajorGold = std::clamp(sConfigMgr->GetOption<float>("AuctionHouseBot.GlyphPricing.MajorGold", 20), 0.0f, 10000.0f);
     GlyphPricingMinorGold = std::clamp(sConfigMgr->GetOption<float>("AuctionHouseBot.GlyphPricing.MinorGold", 5), 0.0f, 10000.0f);
     ProjectilePricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProjectilePricing.Enabled", false);
+    MaxListingsPerItem = std::min(10000u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.ListingCap.MaxPerItem", 0));
     VendorPriceFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.VendorPriceFloor.Enabled", false);
     VendorPriceFloorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.VendorPriceFloor.Percent", 100), 1u, 1000u);
     DisenchantFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.DisenchantFloor.Enabled", false);

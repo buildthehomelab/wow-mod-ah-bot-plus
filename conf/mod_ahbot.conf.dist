@@ -1204,6 +1204,13 @@ AuctionHouseBot.GlyphPricing.MinorGold = 5
 # Only raises. Seller only.
 AuctionHouseBot.ProjectilePricing.Enabled = false
 
+# Most copies of one item the seller's random filling keeps in a house (all owners'
+# auctions count). Class/quality buckets with only a few items otherwise get the whole
+# bucket's share, e.g. thousands of Fish Scales. Material stock refills are not capped
+# (they have their own targets), and ListMultipliedItemIDs stop at the cap too.
+# 0 = no cap.
+AuctionHouseBot.ListingCap.MaxPerItem = 0
+
 # Items an NPC sells for gold (any npc_vendor row with ExtendedCost 0) never list below
 # Percent of that NPC price per unit (item BuyPrice / BuyCount), so the AH doesn't undercut
 # vendor gold sinks. Bags keep their own vendor-aware pricing. Only raises. Seller only.

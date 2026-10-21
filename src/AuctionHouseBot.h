@@ -167,6 +167,7 @@ private:
     float GlyphPricingMinorGold = 5;
     std::unordered_map<uint32, bool> GlyphIsMinor;
     bool ProjectilePricingEnabled = false;
+    uint32 MaxListingsPerItem = 0;
     bool VendorPriceFloorEnabled = false;
     uint32 VendorPriceFloorPercent = 100;
     std::unordered_map<uint32, double> VendorPurchasePrices;

@@ -161,6 +161,8 @@ Each is off by default; see `conf/mod_ahbot.conf.dist` for the keys.
   (bags excepted), so the AH doesn't undercut vendor gold sinks.
 - `DisenchantFloor`: disenchantable gear never lists below the expected value of its
   disenchant materials at the bot's own prices.
+- `ListingCap.MaxPerItem`: the most copies of one item random filling keeps in a house,
+  so a class/quality bucket with only a few items can't flood it.
 
 All but `MountPricing` only raise the seller's quote. The epic gear, glyph and ammo floors
 also feed recipe pricing through the crafted reference. TCG/promo items are best kept off the AH with `DisabledCustomItemIDs`.
