@@ -1305,8 +1305,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
                     VendorRecipes.insert(recipe->ItemId);
             }
         }
-        LOG_INFO("module", "AuctionHouseBot: {} recipes sold by NPCs will not be listed", VendorRecipes.size());
     }
+    uint32 skippedVendorRecipes = 0;
 
     // Fill candidate item templates
     ItemTemplateContainer const* its = sObjectMgr->GetItemTemplateStore();
@@ -1406,6 +1406,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
         // Recipes an NPC sells
         if (VendorRecipes.find(itr->second.ItemId) != VendorRecipes.end())
         {
+            if (itr->second.Bonding != BIND_WHEN_PICKED_UP && itr->second.Bonding != BIND_QUEST_ITEM)
+                ++skippedVendorRecipes; // BoP ones were never listed anyway
             if (debug_Out_Filters)
                 LOG_ERROR("module", "AuctionHouseBot: Item {} disabled (Recipe sold by an NPC, Seller.SkipVendorRecipes)", itr->second.ItemId);
             continue;
@@ -1527,6 +1529,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
         // Store the item ID
         ItemCandidatesByItemClassAndQuality[itr->second.Class][itr->second.Quality].push_back(itr->second.ItemId);
     }
+    if (SkipVendorRecipes)
+        LOG_INFO("module", "AuctionHouseBot: {} tradable recipes sold by NPCs will not be listed (Seller.SkipVendorRecipes)", skippedVendorRecipes);
 
     // Show any debugging information
     if (debug_Out)

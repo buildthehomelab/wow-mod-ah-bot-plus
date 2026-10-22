@@ -1143,7 +1143,9 @@ AuctionHouseBot.IncludedItemIDs = 11732-11734,11736,11737,18332-18335
 
 # If true, the seller bot won't list any recipe that a spawned NPC sells, whatever it
 # costs: gold, reputation-gated or tokens, limited stock included. Seller only: the
-# buyer still bids on player auctions.
+# buyer still bids on player auctions. Wins over IncludedItemIDs. Vendor lists only opened
+# through gossip (no spawned creature of that entry) don't count. Bot auctions already up
+# stay until they expire or `.ahbot empty`.
 AuctionHouseBot.Seller.SkipVendorRecipes = false
 
 # Recipe-aware seller prices. Disabled by default for existing realms.

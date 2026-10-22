@@ -145,7 +145,9 @@ ProgressionPricing or Seller.StablePrices enabled.
 
 With `AuctionHouseBot.Seller.SkipVendorRecipes`, the seller does not list NPC recipes
 at all: any recipe a spawned NPC sells, for gold, reputation or tokens, limited-stock
-offers included. The buyer still bids on player auctions of them.
+offers included. The buyer still bids on player auctions of them. It wins over
+`IncludedItemIDs`; vendor lists only opened through gossip (no spawned creature of that
+entry) don't count; bot auctions already up stay until they expire or `.ahbot empty`.
 
 ```sh
 c++ -std=c++17 -Wall -Wextra -Werror tests/recipe_pricing_test.cpp -o /tmp/recipe-pricing-test
