@@ -143,10 +143,9 @@ unlimited stock, no token cost) never goes above that NPC price. Seller only; it
 on the same seller path as crafted pricing, so it needs CraftedPricing,
 ProgressionPricing or Seller.StablePrices enabled.
 
-With `AuctionHouseBot.Seller.SkipVendorRecipes`, the seller does not list those NPC
-recipes at all: any recipe a spawned NPC sells for plain gold with no reputation
-requirement, limited-stock offers included. Reputation and token recipes stay on the
-AH. The buyer still bids on player auctions of them.
+With `AuctionHouseBot.Seller.SkipVendorRecipes`, the seller does not list NPC recipes
+at all: any recipe a spawned NPC sells, for gold, reputation or tokens, limited-stock
+offers included. The buyer still bids on player auctions of them.
 
 ```sh
 c++ -std=c++17 -Wall -Wextra -Werror tests/recipe_pricing_test.cpp -o /tmp/recipe-pricing-test

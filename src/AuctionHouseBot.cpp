@@ -1283,9 +1283,9 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
     ItemIDsProducedByRecipes.clear();
     ItemIDsProducedByRecipes = GetItemIDsProducedByRecipes();
 
-    // Recipes a spawned NPC sells for plain gold with no reputation requirement.
-    // Anyone can buy those, so the seller leaves them to the vendor.
-    OpenVendorRecipes.clear();
+    // Recipes a spawned NPC sells, for gold, reputation or tokens alike.
+    // The seller leaves those to the vendor.
+    VendorRecipes.clear();
     if (SkipVendorRecipes)
     {
         std::unordered_set<uint32> vendors;
@@ -1301,12 +1301,11 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
             for (VendorItem const* vendorItem : items->m_items)
             {
                 ItemTemplate const* recipe = sObjectMgr->GetItemTemplate(vendorItem->item);
-                if (recipe && recipe->Class == ITEM_CLASS_RECIPE && !vendorItem->ExtendedCost
-                    && recipe->BuyPrice && !recipe->RequiredReputationFaction)
-                    OpenVendorRecipes.insert(recipe->ItemId);
+                if (recipe && recipe->Class == ITEM_CLASS_RECIPE)
+                    VendorRecipes.insert(recipe->ItemId);
             }
         }
-        LOG_INFO("module", "AuctionHouseBot: {} recipes sold by NPCs for gold will not be listed", OpenVendorRecipes.size());
+        LOG_INFO("module", "AuctionHouseBot: {} recipes sold by NPCs will not be listed", VendorRecipes.size());
     }
 
     // Fill candidate item templates
@@ -1404,8 +1403,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
             continue;
         }
 
-        // Recipes an NPC sells for gold
-        if (OpenVendorRecipes.find(itr->second.ItemId) != OpenVendorRecipes.end())
+        // Recipes an NPC sells
+        if (VendorRecipes.find(itr->second.ItemId) != VendorRecipes.end())
         {
             if (debug_Out_Filters)
                 LOG_ERROR("module", "AuctionHouseBot: Item {} disabled (Recipe sold by an NPC, Seller.SkipVendorRecipes)", itr->second.ItemId);

@@ -212,7 +212,7 @@ private:
     uint32 ItemsPerCycle;
     bool DisabledItemTextFilter;
     bool SkipVendorRecipes = false;
-    std::unordered_set<uint32> OpenVendorRecipes;
+    std::unordered_set<uint32> VendorRecipes;
     bool DisabledRecipeProducedItemFilterEnabled;
     std::unordered_set<uint32> ItemIDsProducedByRecipes;
     std::unordered_set<uint32> CatalogCandidates;
