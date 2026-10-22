@@ -15,10 +15,13 @@ Requires an AzerothCore version that is caught up to at least change set 3f46e05
 
 ## Installation
 
+Run this inside your AzerothCore source's `modules/` directory (the repo is `wow-mod-ah-bot-plus`, the module folder is `mod-ah-bot-plus`):
+
 ```
-1. Simply place the module under the `modules` directory of your AzerothCore source. 
-2. Re-run cmake and launch a clean build of AzerothCore.
+git clone https://github.com/buildthehomelab/wow-mod-ah-bot-plus.git mod-ah-bot-plus
 ```
+
+Then re-run cmake and launch a clean build of AzerothCore.
 
 ## Usage
 
