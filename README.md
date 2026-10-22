@@ -106,11 +106,10 @@ are skipped, and stack sizes are reduced when required to fit the auction's mone
 The feature defaults off and preserves the legacy RNG/pricing path when disabled.
 It affects the seller only. The buyer intentionally keeps its legacy willingness to
 pay; seller price increases do not automatically raise buyer payouts. Buyer economics
-and vendor resale arbitrage should be reviewed separately before changing that policy.
+and vendor resale arbitrage are separate from this setting.
 
-Existing auctions retain their recorded prices. Deploy the reviewed module and its
-server manifest pin, enable the feature in the realm's configuration override, then
-plan an explicit refresh of existing bot auctions. `.ahbot empty` removes bot auctions
+Existing auctions retain their recorded prices. After enabling the feature in the module
+configuration, plan an explicit refresh of existing bot auctions. `.ahbot empty` removes bot auctions
 and refunds bids; it is an operational action, not part of enabling this setting.
 No database migration or client patch is needed.
 
@@ -188,16 +187,16 @@ own premium once. Recommending an item for multiple specs/phases never stacks it
 Individual Progression is per character while auctions are shared, so the catalog
 uses the **union of all phases** rather than a realm-wide current phase or the buyer's
 personal progress. The stored phase/state tags make the lists auditable; they do not
-change progression gates. This is published Classic/TBC/Wrath guidance, as requested,
-not a simulation of Evermore's custom talents/itemization. Source omissions and identity
+change progression gates. This is published Classic/TBC/Wrath guidance,
+not a simulation of a realm's custom talents or itemization. Source omissions and identity
 normalization are documented alongside the catalog. Only the existing seller candidate
 rules determine whether an item can be listed; including a BoP item in the reference
 list does not enable it on the AH. Buyer valuations remain unchanged.
 
 Both features can be enabled independently, reload their caches with `.ahbot reload`,
 and leave recorded auctions unchanged until an explicit refresh. Over-cap prices are
-skipped and stacks remain within uint32 auction totals. New code still requires a
-reviewed server pin, rebuild and restart before a live refresh. No schema/client changes.
+skipped and stacks remain within uint32 auction totals. Rebuild and
+restart before a live refresh. No schema/client changes.
 
 To check the generated runtime membership against the source catalog:
 
@@ -231,8 +230,7 @@ are disabled conservatively for that cache build; finished goods still use stabl
 commodity references. The source query runs only when rebuilding the pricing cache.
 
 This change corrects future valuations. Recorded old/inflated auctions must be
-refreshed after rebuilding/restarting the reviewed module and applying its server
-pin/settings. Until that operational refresh is done, the professions addon can still
+refreshed after rebuilding and restarting with the module and settings applied. Until that operational refresh is done, the professions addon can still
 show large asking-price margins from old stock. Such margins are estimates, not
 proof that a player or the AH buyer bot will pay that price.
 
@@ -271,7 +269,7 @@ not a guarantee for every recipe, live material availability or arbitrary player
 
 Buying still follows configured buyer cycles/candidate limits and normal mail delivery. It
 is not an instant-sale endpoint. Existing lower-priced bot stock should be refreshed during
-coordinated deployment. Ship the matched RetailAH and RetailProfessions updates so displayed
+the rebuild. Use matching RetailAH and RetailProfessions versions so displayed
 offers and BiS craft profits agree with actual buying behavior. No SQL/client patch is needed.
 
 ## Crafting material supply
@@ -354,8 +352,8 @@ exceed a material's normal refill target. No existing auctions are deleted or re
 "Pricing error" is used in config/logs; item names and auction UI labels stay unchanged.
 
 These are periodic supply rules, not an instantaneous unlimited availability guarantee.
-No SQL, client patch or addon update is required. Build/restart and in-game verification
-remain deployment steps; inspect logs and live faction stock after deployment.
+No SQL, client patch or addon update is required. Build and restart to apply it. Not yet
+verified in game: inspect logs and live faction stock after the first run.
 
 ### Buyer diagnostics and input validation
 
@@ -407,6 +405,5 @@ from new listings and returns no catalog quote. It never caps below the floor to
 pretend crafting is profitable. Some small cosmetic bags need cheaper ingredients
 or a deliberate premium exception before both goals can be met. Ingredient pricing
 is unchanged by this policy. Unsupported/cyclic bag recipes are also withheld.
-Existing auctions retain their stored prices until expired or explicitly refreshed
-after deployment. Buyer pricing is unchanged. This requires a reviewed module merge,
-an exact merged-commit wow-server pin and a rebuild/restart before taking effect.
+Existing auctions retain their stored prices until expired or explicitly refreshed.
+Buyer pricing is unchanged. Rebuild and restart before it takes effect.

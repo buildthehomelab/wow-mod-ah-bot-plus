@@ -20,7 +20,7 @@ The lists are available at these publisher entry points; each row links its exac
 - [Wrath example](https://wowtbc.gg/wotlk/bis-list/fury-warrior/)
 
 The publisher excludes some PvP/world-boss choices and pre-raid world-drop BoE epics.
-Three requested Classic variants were unavailable at snapshot time: two-handed Fury,
+Three expected Classic variants were unavailable at snapshot time: two-handed Fury,
 Protection mitigation and Protection Paladin. The separately published Fury/Protection
 Warrior tank list is included. The catalog is complete for the retrieved publisher
 pages, **not a claim of exhaustive BiS coverage for every possible realm build**.
@@ -83,4 +83,4 @@ and receipt hash. Regeneration refuses changed raw content. Source cache and ful
 item exports are audit inputs rather than committed publisher page copies. The runtime
 header is generated solely from the committed TSV; `--check` validates that union
 without network or database access. Future source refreshes should update receipts,
-review identity changes/coverage and regenerate the header through a new reviewed PR.
+review identity changes/coverage and regenerate the header.
