@@ -1283,6 +1283,31 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
     ItemIDsProducedByRecipes.clear();
     ItemIDsProducedByRecipes = GetItemIDsProducedByRecipes();
 
+    // Recipes a spawned NPC sells, for gold, reputation or tokens alike.
+    // The seller leaves those to the vendor.
+    VendorRecipes.clear();
+    if (SkipVendorRecipes)
+    {
+        std::unordered_set<uint32> vendors;
+        for (auto const& [spawnId, data] : sObjectMgr->GetAllCreatureData())
+            for (uint32 entry : {data.id, data.id2, data.id3})
+                if (entry)
+                    vendors.insert(entry);
+        for (uint32 entry : vendors)
+        {
+            VendorItemData const* items = sObjectMgr->GetNpcVendorItemList(entry);
+            if (!items)
+                continue;
+            for (VendorItem const* vendorItem : items->m_items)
+            {
+                ItemTemplate const* recipe = sObjectMgr->GetItemTemplate(vendorItem->item);
+                if (recipe && recipe->Class == ITEM_CLASS_RECIPE)
+                    VendorRecipes.insert(recipe->ItemId);
+            }
+        }
+    }
+    uint32 skippedVendorRecipes = 0;
+
     // Fill candidate item templates
     ItemTemplateContainer const* its = sObjectMgr->GetItemTemplateStore();
     for (ItemTemplateContainer::const_iterator itr = its->begin(); itr != its->end(); ++itr)
@@ -1375,6 +1400,16 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
         {
             if (debug_Out_Filters)
                 LOG_ERROR("module", "AuctionHouseBot: Item {} disabled (Configured by DisabledItemIDs and DisabledCraftedItemIDs)", itr->second.ItemId);
+            continue;
+        }
+
+        // Recipes an NPC sells
+        if (VendorRecipes.find(itr->second.ItemId) != VendorRecipes.end())
+        {
+            if (itr->second.Bonding != BIND_WHEN_PICKED_UP && itr->second.Bonding != BIND_QUEST_ITEM)
+                ++skippedVendorRecipes; // BoP ones were never listed anyway
+            if (debug_Out_Filters)
+                LOG_ERROR("module", "AuctionHouseBot: Item {} disabled (Recipe sold by an NPC, Seller.SkipVendorRecipes)", itr->second.ItemId);
             continue;
         }
 
@@ -1494,6 +1529,8 @@ void AuctionHouseBot::PopulateItemCandidatesAndProportions()
         // Store the item ID
         ItemCandidatesByItemClassAndQuality[itr->second.Class][itr->second.Quality].push_back(itr->second.ItemId);
     }
+    if (SkipVendorRecipes)
+        LOG_INFO("module", "AuctionHouseBot: {} tradable recipes sold by NPCs will not be listed (Seller.SkipVendorRecipes)", skippedVendorRecipes);
 
     // Show any debugging information
     if (debug_Out)
@@ -3183,6 +3220,7 @@ void AuctionHouseBot::InitializeConfiguration()
 
     // Disabled Items
     DisabledItemTextFilter = sConfigMgr->GetOption<bool>("AuctionHouseBot.DisabledItemTextFilter", true);
+    SkipVendorRecipes = sConfigMgr->GetOption<bool>("AuctionHouseBot.Seller.SkipVendorRecipes", false);
     DisabledRecipeProducedItemFilterEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.DisabledRecipeProducedItemFilterEnabled", false);
     DisabledItems.clear();
     ParseNumberListToSet(DisabledItems, sConfigMgr->GetOption<std::string>("AuctionHouseBot.DisabledInvalidItemIDs", ""), "AuctionHouseBot.DisabledInvalidItemIDs");
