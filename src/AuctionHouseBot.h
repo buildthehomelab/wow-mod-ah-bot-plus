@@ -177,11 +177,15 @@ private:
     std::unordered_map<uint32, std::vector<std::pair<uint32, double>>> DisenchantYields;
     double GetCategoryFloor(ItemTemplate const* proto) const;
     void PopulateCraftedPricing();
+    double GetCraftedPricingCut(AuctionHouseEntry const* house) const;
+    AhBotPricing::Model const* GetCraftedPricingModel(AuctionHouseEntry const* house);
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;
     bool BuyingBotEnabled;
     bool ProgressionBuyerPricingEnabled = false;
     uint32 ProgressionBuyerMarketPercent = 90;
+    bool ReferenceBuyerPricingEnabled = false;
+    uint32 ReferenceBuyerMarketPercent = 80;
     bool ReturnExpiredAuctionItemsToBot;
     uint32 CyclesBetweenBuyActionMin;
     uint32 CyclesBetweenBuyAction;
@@ -424,7 +428,9 @@ private:
 public:
     std::vector<std::string> GetStatus();
     uint64 GetSellerQuote(uint32 item, uint32 house);
-    bool GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
+    bool GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
+    uint64 GetBuyerReference(uint32 item, uint32 house);
+    uint64 GetPricingErrorPrice(ItemTemplate const* proto, uint32 house);
     void RebuildSellerCatalog();
     void PopulateMaterialStock();
 

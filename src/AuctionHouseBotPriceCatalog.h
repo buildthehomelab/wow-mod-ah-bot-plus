@@ -8,8 +8,9 @@ namespace AhBotPriceCatalog
 {
     using Provider = std::uint64_t (*)(std::uint32_t item, std::uint32_t house);
     inline Provider provider = nullptr;
-    // True means this item is handled by the new buyer policy; zero then means no offer.
-    // False leaves non-BiS/disabled-policy items on the legacy buyer path.
+    // True means this item is handled by a reference buyer policy (BiS, or every quoted item
+    // with Buyer.ReferencePricing); zero then means no offer. False leaves the item on the
+    // legacy buyer path.
     using BuyerProvider = bool (*)(std::uint32_t item, std::uint32_t house, std::uint64_t& offer);
     inline BuyerProvider buyerProvider = nullptr;
 

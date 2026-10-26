@@ -741,10 +741,28 @@ void AuctionHouseBot::PopulateCraftedPricing()
         } while (bagVendors->NextRow());
     }
 
+    // Specialization extras (spell -> chance %, most extra casts' worth), for average yields.
+    std::unordered_map<uint32, std::pair<float, int32>> extraItems;
+    if (QueryResult extra = WorldDatabase.Query("SELECT spellId, additionalCreateChance, additionalMaxNum FROM skill_extra_item_template"))
+    {
+        do
+        {
+            Field* fields = extra->Fetch();
+            extraItems[fields[0].Get<uint32>()] = {fields[1].Get<float>(), fields[2].Get<int32>()};
+        } while (extra->NextRow());
+    }
+
     std::vector<ItemTemplate const*> vellums;
+    // Item-use combines (Darkmoon cards into a deck, motes into a primal) are recipes too.
+    std::unordered_set<uint32> combines;
     for (auto const& [id, item] : *sObjectMgr->GetItemTemplateStore())
+    {
         if (item.IsArmorVellum() || item.IsWeaponVellum())
             vellums.push_back(&item);
+        for (auto const& itemSpell : item.Spells)
+            if (itemSpell.SpellId > 0 && itemSpell.SpellTrigger == ITEM_SPELLTRIGGER_ON_USE)
+                combines.insert(itemSpell.SpellId);
+    }
     for (uint32 spellId = 1; spellId < sSpellStore.GetNumRows(); ++spellId)
     {
         SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellId);
@@ -760,7 +778,7 @@ void AuctionHouseBot::PopulateCraftedPricing()
             if (it->second->SkillLine == SKILL_ENCHANTING)
                 enchanting = true;
         }
-        if (!profession)
+        if (!profession && !combines.count(spellId))
             continue;
 
         SpellEffectInfo const* create = nullptr;
@@ -789,6 +807,10 @@ void AuctionHouseBot::PopulateCraftedPricing()
         bool scroll = create->Effect == SPELL_EFFECT_ENCHANT_ITEM;
         // An enchant effect's points are the enchant bonus, not a scroll batch count.
         recipe.output = AhBotPricing::GuaranteedOutput(scroll, create->BasePoints, create->DieSides, output->GetMaxStackSize());
+        // Every specialization is assumed known (mod-profession-specializations teaches them all).
+        auto extra = extraItems.find(spellId);
+        recipe.expected = AhBotPricing::ExpectedOutput(scroll, create->BasePoints, create->DieSides, output->GetMaxStackSize(),
+            extra == extraItems.end() ? 0 : extra->second.first, extra == extraItems.end() ? 0 : extra->second.second);
         for (uint32 slot = 0; slot < MAX_SPELL_REAGENTS; ++slot)
         {
             if (spell->Reagent[slot] <= 0 || spell->ReagentCount[slot] <= 0)
@@ -909,9 +931,11 @@ void AuctionHouseBot::PopulateCraftedPricing()
         }
     }
 
-    // NPC gold purchase price per unit, for the vendor floor. Bags keep their own pricing.
+    // NPC gold purchase price per unit, for the vendor floor and the reference buyer's caps.
+    // Bags keep their own pricing.
     VendorPurchasePrices.clear();
-    if (VendorPriceFloorEnabled)
+    bool referenceBuyers = ReferenceBuyerPricingEnabled || ProgressionBuyerPricingEnabled;
+    if (VendorPriceFloorEnabled || referenceBuyers)
     {
         QueryResult vendors = WorldDatabase.Query("SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0");
         if (vendors)
@@ -981,18 +1005,22 @@ void AuctionHouseBot::PopulateCraftedPricing()
         item.independentSupply = independentlySupplied.count(id) != 0;
         item.vendor = proto->SellPrice;
         item.quote = std::max<double>(std::max<uint64>(buyout, proto->SellPrice), GetCategoryFloor(proto));
+        // Buyer cost only: crafting from NPC-bought materials must not pay when sold to the bot.
+        auto npc = referenceBuyers ? VendorPurchasePrices.find(id) : VendorPurchasePrices.end();
+        item.npc = npc != VendorPurchasePrices.end() ? npc->second : 0;
         if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(id))
             item.demandMultiplier = ProgressionBisMultiplier;
-        if (!CraftedPricingEnabled)
+        // The reference buyer keeps recipes for its cost even without seller floors.
+        if (!CraftedPricingEnabled && !referenceBuyers)
             item.recipes.clear();
     }
+    model.floors = CraftedPricingEnabled;
     CraftedPricingReady = true;
 }
 
-bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout)
+// The auction cut the crafted prices keep their margin after.
+double AuctionHouseBot::GetCraftedPricingCut(AuctionHouseEntry const* house) const
 {
-    if (!CraftedPricingReady)
-        PopulateCraftedPricing();
     // Match the actual house cut. Stable faction prices use the higher faction cut
     // for both houses so the shared quote preserves the margin even with custom fees.
     double cutPercent = house->cutPercent;
@@ -1003,7 +1031,15 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
         if (alliance && horde && (house == alliance || house == horde))
             cutPercent = std::max(alliance->cutPercent, horde->cutPercent);
     }
-    double cut = std::max(0.0, cutPercent * sWorld->getRate(RATE_AUCTION_CUT) / 100.0);
+    return std::max(0.0, cutPercent * sWorld->getRate(RATE_AUCTION_CUT) / 100.0);
+}
+
+// The crafted price model for a house's auction cut, built on first use; null when invalid.
+AhBotPricing::Model const* AuctionHouseBot::GetCraftedPricingModel(AuctionHouseEntry const* house)
+{
+    if (!CraftedPricingReady)
+        PopulateCraftedPricing();
+    double cut = GetCraftedPricingCut(house);
     auto it = CraftedPricingModels.find(cut);
     if (it == CraftedPricingModels.end())
     {
@@ -1012,11 +1048,17 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
         it = CraftedPricingModels.emplace(cut, std::move(model)).first;
         LOG_INFO("module", "AuctionHouseBot: Built crafting prices with {}% margin and {}% auction cut", CraftedPricingMargin * 100, cut * 100);
     }
-    if (!it->second.IsValid())
+    return it->second.IsValid() ? &it->second : nullptr;
+}
+
+bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout)
+{
+    AhBotPricing::Model const* model = GetCraftedPricingModel(house);
+    if (!model)
         return false;
     double minimum = GetCategoryFloor(proto);
     // Never cheaper than buying from an NPC, or than what it disenchants into.
-    auto npc = VendorPurchasePrices.find(proto->ItemId);
+    auto npc = VendorPriceFloorEnabled ? VendorPurchasePrices.find(proto->ItemId) : VendorPurchasePrices.end();
     if (npc != VendorPurchasePrices.end())
         minimum = std::max(minimum, npc->second * VendorPriceFloorPercent / 100);
     auto yields = proto->DisenchantID ? DisenchantYields.find(proto->DisenchantID) : DisenchantYields.end();
@@ -1024,7 +1066,7 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
     {
         double value = 0;
         for (auto const& [material, count] : yields->second)
-            value += it->second.Get(material).reference * count;
+            value += model->Get(material).reference * count;
         minimum = std::max(minimum, value * DisenchantFloorPercent / 100);
     }
     AhBotPricing::RaiseToFloor(minimum, std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
@@ -1044,7 +1086,7 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
             auto [item, count] = output->second;
             uint32 percent = AhBotPricing::IsProgressionBis(item) ? RecipePricingBisPercent : RecipePricingPercent;
             auto vendor = VendorRecipePurchasePrices.find(proto->ItemId);
-            AhBotPricing::ApplyRecipePrice(it->second.Get(item).reference * count, percent,
+            AhBotPricing::ApplyRecipePrice(model->Get(item).reference * count, percent,
                 vendor == VendorRecipePurchasePrices.end() ? 0 : vendor->second,
                 std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
         }
@@ -1057,10 +1099,10 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
         auto vendor = VendorBagPurchasePrices.find(
             std::make_tuple(proto->ContainerSlots, proto->BagFamily, proto->SubClass));
         double purchase = vendor == VendorBagPurchasePrices.end() ? 0 : vendor->second;
-        return AhBotPricing::ApplyBagPrice(it->second.Get(proto->ItemId), crafted, purchase,
-            proto->SellPrice, cut, std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+        return AhBotPricing::ApplyBagPrice(model->Get(proto->ItemId), crafted, purchase,
+            proto->SellPrice, GetCraftedPricingCut(house), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
     }
-    return AhBotPricing::Model::Apply(it->second.Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
+    return AhBotPricing::Model::Apply(model->Get(proto->ItemId), std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
 }
 
 // Seller-only minimum unit price for epic gear, glyphs and ammo; 0 when none applies.
@@ -1081,18 +1123,49 @@ double AuctionHouseBot::GetCategoryFloor(ItemTemplate const* proto) const
     return 0;
 }
 
-bool AuctionHouseBot::GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer)
+// A pricing error sells at vendor value, but never below what a reference buyer pays per unit,
+// so buying the stack and relisting it for the bot doesn't pay.
+uint64 AuctionHouseBot::GetPricingErrorPrice(ItemTemplate const* proto, uint32 house)
+{
+    uint64 price = AhBotStock::VendorBargain(proto->SellPrice, PricingErrorsVendorPercent);
+    std::uint64_t offer = 0;
+    if (GetReferenceBuyerOffer(proto->ItemId, house, offer))
+        price = std::max<uint64>(price, offer);
+    return price;
+}
+
+// Buyer offers from the buyer reference. BiS items use their own percent and fail closed;
+// with Buyer.ReferencePricing every other item the seller quotes follows too, and items
+// without a seller quote stay on the legacy random buyer.
+bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer)
 {
     offer = 0;
-    if (!ProgressionBuyerPricingEnabled || !AhBotPricing::IsProgressionBis(item))
-        return false;
-    // Targeted items fail closed if the corresponding reference/buyer is unavailable.
+    bool const bis = ProgressionBuyerPricingEnabled && AhBotPricing::IsProgressionBis(item);
+    bool const active = BuyingBotEnabled && BuyingBotBuyCandidatesPerBuyCycleMax != 0;
+    uint64 reference = 0;
+    if (bis)
+    {
+        // Targeted items fail closed if the corresponding reference/buyer is unavailable.
+        if (!active || !ProgressionPricingEnabled)
+            return true;
+        reference = GetBuyerReference(item, house);
+    }
+    else
+    {
+        // No seller quote: legacy buyer. A quoted item whose reference is 0 gets no offer.
+        if (!ReferenceBuyerPricingEnabled || !active || !GetSellerQuote(item, house))
+            return false;
+        reference = GetBuyerReference(item, house);
+    }
     auto proto = sObjectMgr->GetItemTemplate(item);
-    if (!BuyingBotEnabled || BuyingBotBuyCandidatesPerBuyCycleMax == 0 || !ProgressionPricingEnabled
-        || !proto || proto->Bonding == BIND_WHEN_PICKED_UP || proto->Bonding == BIND_QUEST_ITEM
+    if (!proto || proto->Bonding == BIND_WHEN_PICKED_UP || proto->Bonding == BIND_QUEST_ITEM
         || (BuyerSkipItemsWithoutVendorPrice && IsItemWithoutVendorPrice(proto)))
         return true;
-    offer = AhBotPricing::BisBuyerOffer(GetSellerQuote(item, house), ProgressionBuyerMarketPercent);
+    // Capped by the NPC price, so buying from a vendor to sell to the bot always loses gold
+    // (bags are not in the map; their seller price is already capped below the NPC's).
+    auto npc = VendorPurchasePrices.find(item);
+    offer = AhBotPricing::ReferenceBuyerOffer(reference, bis ? ProgressionBuyerMarketPercent : ReferenceBuyerMarketPercent,
+        npc == VendorPurchasePrices.end() ? 0 : npc->second);
     uint32 vendor = item < vendorItemsPrices.size() ? vendorItemsPrices[item] : UINT32_MAX;
     if (PreventOverpayingForVendorItems && vendor > 0 && vendor != UINT32_MAX)
         offer = std::min<std::uint64_t>(offer, vendor);
@@ -1173,6 +1246,22 @@ void AuctionHouseBot::RebuildSellerCatalog()
         for (uint32 id : ItemCandidatesByItemClassAndQuality[node.ItemClassID][node.ItemQualityID])
             CatalogCandidates.insert(id);
     CatalogCandidates.insert(MaterialStockItems.begin(), MaterialStockItems.end());
+}
+
+// What the reference buyers pay from: the seller quote, but never more than a crafted item's
+// cost basis, so seller-only floors (epic gear, glyphs, BiS demand) and specialization extras
+// can't turn crafting for the bot into gold.
+uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house)
+{
+    uint64 quote = GetSellerQuote(item, house);
+    if (!quote)
+        return 0;
+    auto entry = AuctionHouseMgr::GetAuctionHouseEntryFromHouse(AuctionHouseId(house));
+    AhBotPricing::Model const* model = entry ? GetCraftedPricingModel(entry) : nullptr;
+    if (!model)
+        return 0;
+    double cost = model->Get(item).buyer;
+    return cost >= 0 ? std::min<uint64>(quote, uint64(cost)) : quote;
 }
 
 // The same deterministic seller path used for new listings, cached until config/candidates reload.
@@ -1678,7 +1767,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
                 candidates.pop_back();
                 auto proto = sObjectMgr->GetItemTemplate(item);
                 uint64 price = kind == AhBotStock::Kind::PricingError
-                    ? AhBotStock::VendorBargain(proto->SellPrice, PricingErrorsVendorPercent)
+                    ? GetPricingErrorPrice(proto, config->GetAHID())
                     : GetSellerQuote(item, config->GetAHID());
                 uint32 cap = std::min<uint64>(proto->GetMaxStackSize(), UINT32_MAX / std::max<uint64>(price, 1));
                 uint32 count;
@@ -1861,7 +1950,7 @@ void AuctionHouseBot::AddNewAuctions(std::vector<Player*> AHBPlayers, FactionSpe
             if (listingKind == AhBotStock::Kind::PricingError)
             {
                 // Deliberate one-off exception: normal catalog quotes/floors stay unchanged.
-                buyoutPrice = bidPrice = AhBotStock::VendorBargain(prototype->SellPrice, PricingErrorsVendorPercent);
+                buyoutPrice = bidPrice = GetPricingErrorPrice(prototype, config->GetAHID());
             }
             else if (CraftedPricingEnabled || ProgressionPricingEnabled || StableSellerPrices)
             {
@@ -2466,7 +2555,7 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
             continue;
         }
         std::uint64_t offer = 0;
-        if (GetProgressionBuyerOffer(proto->ItemId, config->GetAHID(), offer) && !offer)
+        if (GetReferenceBuyerOffer(proto->ItemId, config->GetAHID(), offer) && !offer)
         {
             ++stats.noOffer;
             continue;
@@ -2533,7 +2622,7 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         uint64 willingToSpendPerItemPrice = 0;
         uint64 discardBidPrice = 0;
         std::uint64_t referenceOffer = 0;
-        bool const referenceBuyer = GetProgressionBuyerOffer(prototype->ItemId, config->GetAHID(), referenceOffer);
+        bool const referenceBuyer = GetReferenceBuyerOffer(prototype->ItemId, config->GetAHID(), referenceOffer);
         if (referenceBuyer)
         {
             if (!referenceOffer)
@@ -2866,8 +2955,12 @@ void AuctionHouseBot::InitializeConfiguration()
     ProgressionBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent", 90);
     if (ProgressionBuyerMarketPercent == 0 || ProgressionBuyerMarketPercent >= 100)
         ProgressionBuyerMarketPercent = 90;
+    ReferenceBuyerPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.ReferencePricing.Enabled", false);
+    ReferenceBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ReferencePricing.MarketPercent", 80);
+    if (ReferenceBuyerMarketPercent == 0 || ReferenceBuyerMarketPercent >= 100)
+        ReferenceBuyerMarketPercent = 80;
     AhBotPriceCatalog::buyerProvider = [](std::uint32_t item, std::uint32_t house, std::uint64_t& offer) {
-        return auctionbot->GetProgressionBuyerOffer(item, house, offer);
+        return auctionbot->GetReferenceBuyerOffer(item, house, offer);
     };
     AhBotPriceCatalog::provider = [](std::uint32_t item, std::uint32_t house) -> std::uint64_t {
         return auctionbot->GetSellerQuote(item, house);
@@ -2912,6 +3005,8 @@ void AuctionHouseBot::InitializeConfiguration()
     StableSellerPrices = sConfigMgr->GetOption<bool>("AuctionHouseBot.Seller.StablePrices", false);
     if (!StableSellerPrices && (MaterialStockRespectPlayerListings || PricingErrorsEnabled || LargeStacksEnabled))
         LOG_WARN("module", "AHBot material stock: player protection and special listings need Seller.StablePrices; enable it to activate those features");
+    if (ReferenceBuyerPricingEnabled && !StableSellerPrices)
+        LOG_WARN("module", "AuctionHouseBot: Buyer.ReferencePricing needs Seller.StablePrices; the buyer stays on legacy prices");
     ProgressionPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ProgressionPricing.Enabled", false);
     ProgressionBisMultiplier = sConfigMgr->GetOption<float>("AuctionHouseBot.ProgressionPricing.BisMultiplier", 1.5f);
     if (!std::isfinite(ProgressionBisMultiplier) || ProgressionBisMultiplier < 1 || ProgressionBisMultiplier > 10)

@@ -32,4 +32,15 @@ int main()
     auto floorPrice = std::uint64_t(std::ceil(cost * 1.15 / .95));
     auto net = std::uint64_t(std::floor(BisBuyerOffer(floorPrice, 90) * .95));
     assert(net >= 1034999);
+
+    // Reference buyer for every item: same integer share, capped by the NPC gold price.
+    assert(ReferenceBuyerOffer(reference, 80, 0) == 1696000);
+    assert(ReferenceBuyerOffer(reference, 80, 1000000) == 800000); // NPC sells it for 100g.
+    assert(ReferenceBuyerOffer(reference, 80, 1e12) == 1696000);   // NPC price far above: no effect.
+    assert(ReferenceBuyerOffer(0, 80, 1000) == 0);
+    // Buying from the NPC and selling to the bot always loses gold, even before the cut.
+    assert(ReferenceBuyerOffer(5000000, 99, 1234) < 1234);
+    // At 80%, a craft from bot-priced ingredients returns about 92% after the 5% cut.
+    auto craftNet = std::floor(ReferenceBuyerOffer(floorPrice, 80, 0) * .95);
+    assert(craftNet < cost && craftNet >= 919999);
 }

@@ -1151,10 +1151,12 @@ AuctionHouseBot.Seller.SkipVendorRecipes = false
 # Recipe-aware seller prices. Disabled by default for existing realms.
 # Uses the highest configured bot buyout for each ingredient as a stable AH replacement
 # reference. Crafted intermediates use their own recipe-aware quote; cheapest supported
-# non-cyclic recipe wins. Player listings cannot manipulate this calculation.
+# non-cyclic recipe wins. Item-use combines (Darkmoon decks, motes into primals) count as
+# recipes. Player listings cannot manipulate this calculation.
 # New crafted listings (including complete overrides) keep at least this margin after
 # the house's actual auction cut. Bids also respect the floor. Deposits on failed sales
-# and bonus output procs are not included. Does not change buyer willingness to pay.
+# and bonus output procs are not included. The buyer only follows crafting costs with
+# Buyer.ReferencePricing or Buyer.ProgressionPricing.
 AuctionHouseBot.CraftedPricing.Enabled = false
 # Fraction of ingredient cost retained as crafting profit after the AH cut; 0.15 = 15%.
 # Valid range 0..10. Invalid/nonfinite values fall back to 0.15.
@@ -1237,7 +1239,8 @@ AuctionHouseBot.DisenchantFloor.Percent = 100
 # Seller only; the buyer's willingness to pay and randomness are unchanged.
 AuctionHouseBot.Seller.StablePrices = false
 
-# BiS buyer offers from the authoritative stable seller reference (not player asks).
+# BiS buyer offers from the stable buyer reference (not player asks): the seller quote, or a
+# craftable item's making cost plus margin when lower (see Buyer.ReferencePricing).
 # Requires Buyer.Enabled, ProgressionPricing.Enabled and Seller.StablePrices.
 # Only catalogued BiS items use this policy; ordinary items retain legacy buyer RNG.
 # The inclusive gross per-unit offer is floor(reference * MarketPercent / 100).
@@ -1246,3 +1249,17 @@ AuctionHouseBot.Seller.StablePrices = false
 AuctionHouseBot.Buyer.ProgressionPricing.Enabled = false
 # Integer range 1..99; invalid values fall back to 90 (10% below reference).
 AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90
+
+# Reference buyer offers for every item, not only BiS: floor(reference * MarketPercent / 100)
+# per unit. The reference is the stable seller quote, except that anything with a recipe
+# (professions, item-use combines) counts at most its cheapest making cost at average yield
+# plus CraftedPricing.ProfitMargin and the auction cut, so seller-only floors (epic gear,
+# glyphs, BiS demand) never reach the buyer for crafts. The offer never exceeds MarketPercent
+# of an item's NPC gold price, and pricing-error stacks never list below it. Items the seller
+# never quotes keep the legacy buyer. Requires EnableSeller, Buyer.Enabled and
+# Seller.StablePrices. AcceptablePriceModifier is not applied. Buyer.ProgressionPricing (BiS)
+# uses the same reference with its own percent.
+AuctionHouseBot.Buyer.ReferencePricing.Enabled = false
+# Integer range 1..99; invalid values fall back to 80. Above ~87 crafting from bot-priced
+# materials and selling to the bot makes gold (15% crafting margin).
+AuctionHouseBot.Buyer.ReferencePricing.MarketPercent = 80
