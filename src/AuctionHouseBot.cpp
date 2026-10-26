@@ -951,23 +951,27 @@ void AuctionHouseBot::PopulateCraftedPricing()
     }
 
     // Expected contents of openable items (item_loot_template, following references).
-    // Quest-only rows and rows outside the default loot mode (0 counts as 1, as in the core)
-    // never drop from an opened item; the core skips MinCount 0 rows at load.
+    // Quest-only items and rows outside the default loot mode (0 counts as 1, as in the core)
+    // never drop from an opened item. Like the core's loader, skip MinCount 0 rows and items
+    // without a template, and still follow references marked QuestRequired.
     ContainerContents.clear();
     if (ContainerFloorEnabled)
     {
         auto load = [](char const* table, AhBotPricing::DropTables& tables)
         {
             QueryResult loot = WorldDatabase.Query("SELECT Entry, Item, Reference, Chance, GroupId, MinCount, MaxCount "
-                "FROM {} WHERE QuestRequired = 0 AND MinCount > 0 AND (LootMode = 0 OR (LootMode & 1) != 0)", table);
+                "FROM {} WHERE (QuestRequired = 0 OR Reference != 0) AND MinCount > 0 "
+                "AND (LootMode = 0 OR (LootMode & 1) != 0)", table);
             if (!loot)
                 return;
             do
             {
                 Field* fields = loot->Fetch();
+                uint32 reference = std::abs(fields[2].Get<int32>());
+                if (!reference && !sObjectMgr->GetItemTemplate(fields[1].Get<uint32>()))
+                    continue;
                 tables[fields[0].Get<uint32>()].push_back({fields[1].Get<uint32>(), fields[3].Get<float>(),
-                    fields[4].Get<uint8>(), fields[5].Get<uint8>(), fields[6].Get<uint8>(),
-                    uint32(std::abs(fields[2].Get<int32>()))});
+                    fields[4].Get<uint8>(), fields[5].Get<uint8>(), fields[6].Get<uint8>(), reference});
             } while (loot->NextRow());
         };
         AhBotPricing::DropTables containers, references;
