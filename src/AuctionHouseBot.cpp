@@ -1127,7 +1127,7 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
                     return 0.0;
                 if (content->Bonding == BIND_WHEN_PICKED_UP || content->Bonding == BIND_QUEST_ITEM)
                     return double(content->SellPrice);
-                return it->second.Get(item).reference;
+                return model->Get(item).reference;
             });
         minimum = std::max(minimum, value * ContainerFloorPercent / 100);
     }

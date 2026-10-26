@@ -293,7 +293,7 @@ offers and BiS craft profits agree with actual buying behavior. No SQL/client pa
 
 ## Reference buyer pricing (all items)
 
-Every seller floor (crafting, vendor, disenchant, epic gear, glyph, recipe pricing) is seller
+Every seller floor (crafting, vendor, disenchant, epic gear, glyph, recipe, container pricing) is seller
 only, so without this the buyer offers the bare category formula: a crafted item can list at
 hundreds of times what the bot will pay for it. `AuctionHouseBot.Buyer.ReferencePricing.Enabled
 = true` makes the buyer offer floor(`MarketPercent`% of the buyer reference) per unit for every
