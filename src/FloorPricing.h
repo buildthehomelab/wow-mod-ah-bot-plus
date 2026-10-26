@@ -42,12 +42,16 @@ inline std::uint32_t MountTier(std::uint32_t skillRank, bool riding)
         skillRank = skillRank > 75 ? skillRank - 75 : 0;
     return skillRank >= 300 ? 3 : skillRank >= 225 ? 2 : skillRank >= 150 ? 1 : 0;
 }
-// Disenchant loot rows (loot template semantics): ungrouped rows roll independently;
+// Loot rows (loot template semantics): ungrouped rows roll independently;
 // inside a group, explicit-chance rows come first and chance-0 rows share what is left.
-struct DropRow { std::uint32_t item; double chance; std::uint32_t group; std::uint32_t minCount; std::uint32_t maxCount; };
+// A Reference row rolls that reference table MaxCount times, as the core does.
+struct DropRow { std::uint32_t item; double chance; std::uint32_t group; std::uint32_t minCount; std::uint32_t maxCount; std::uint32_t reference = 0; };
+using DropTables = std::map<std::uint32_t, std::vector<DropRow>>;
 
-// Expected units of each item per loot roll.
-inline std::map<std::uint32_t, double> ExpectedDrops(std::vector<DropRow> const& rows)
+// Expected units of each item per loot roll. Reference rows are followed into References
+// (reference_loot_template) up to a few levels deep; without References they are ignored.
+inline std::map<std::uint32_t, double> ExpectedDrops(std::vector<DropRow> const& rows,
+    DropTables const* references = nullptr, int depth = 0)
 {
     std::map<std::uint32_t, double> explicitTotal, zeroRows;
     for (auto const& row : rows)
@@ -65,11 +69,40 @@ inline std::map<std::uint32_t, double> ExpectedDrops(std::vector<DropRow> const&
         if (row.group && row.chance <= 0)
             chance = std::max(0.0, 100 - explicitTotal[row.group]) / 100 / zeroRows[row.group];
         chance = std::clamp(chance, 0.0, 1.0);
+        if (chance <= 0)
+            continue;
+        if (row.reference)
+        {
+            if (!references || depth >= 8)
+                continue;
+            auto table = references->find(row.reference);
+            if (table == references->end())
+                continue;
+            for (auto const& [item, count] : ExpectedDrops(table->second, references, depth + 1))
+                expected[item] += chance * row.maxCount * count;
+            continue;
+        }
         double count = (double(row.minCount) + std::max(row.minCount, row.maxCount)) / 2;
-        if (chance > 0 && count > 0)
+        if (count > 0)
             expected[row.item] += chance * count;
     }
     return expected;
+}
+
+// Expected copper an opened container pays out: Contents at ValueOf(item) each, plus its
+// money loot (the core pays MaxMoney when it is not above MinMoney, else a uniform roll).
+template <class ValueOf>
+inline double ContainerValue(std::map<std::uint32_t, double> const& contents,
+    std::uint32_t minMoney, std::uint32_t maxMoney, ValueOf valueOf)
+{
+    double value = maxMoney <= minMoney ? maxMoney : (double(minMoney) + maxMoney) / 2;
+    for (auto const& [item, count] : contents)
+    {
+        double each = valueOf(item);
+        if (std::isfinite(each) && each > 0)
+            value += each * count;
+    }
+    return value;
 }
 
 // Developer placeholder names the stock text filter misses: "Unused ...", "Durability ...",

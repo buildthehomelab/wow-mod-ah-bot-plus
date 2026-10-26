@@ -1230,6 +1230,16 @@ AuctionHouseBot.VendorPriceFloor.Percent = 100
 AuctionHouseBot.DisenchantFloor.Enabled = false
 AuctionHouseBot.DisenchantFloor.Percent = 100
 
+# Openable items (lockboxes, sacks of gems, clams: ITEM_FLAG_HAS_LOOT) never list below
+# Percent of what opening one pays out: item_loot_template contents, following
+# reference_loot_template rows, at the bot's own reference prices, plus the item's money
+# loot. Soulbound contents count at their vendor price. Quest-only rows are ignored, and
+# so are the Rate.Drop.* rates. Stops buying a 1g lockbox from the bot and selling its
+# contents. Only raises. Seller only. Needs CraftedPricing, ProgressionPricing or
+# Seller.StablePrices enabled.
+AuctionHouseBot.ContainerFloor.Enabled = false
+AuctionHouseBot.ContainerFloor.Percent = 100
+
 # Use one deterministic upper configured unit quote instead of rolling listing prices.
 # Alliance and Horde get identical new per-unit prices; stack quantities may differ.
 # Crafted/progression floors still apply, using the higher faction fee for both houses.

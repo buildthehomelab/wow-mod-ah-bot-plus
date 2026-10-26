@@ -49,6 +49,27 @@ int main()
     auto over = ExpectedDrops({{6, 120, 2, 1, 1}, {7, 0, 2, 1, 1}});
     assert(over[6] == 1 && !over.count(7));
 
+    // Containers: a Reference row rolls its reference table MaxCount times.
+    DropTables references{
+        {1000, {{10, 50, 1, 1, 1}, {11, 0, 1, 1, 1}}},              // one gem per roll, 50/50
+        {2000, {{12, 100, 0, 3, 5}}},                              // always 3-5 ore
+        {3000, {{13, 100, 0, 1, 1}, {0, 100, 0, 1, 1, 3000}}}};    // refers to itself
+    auto sack = ExpectedDrops({{0, 100, 0, 1, 2, 1000}, {14, 25, 0, 2, 2}}, &references);
+    assert(std::fabs(sack[10] - 1) < 1e-9 && std::fabs(sack[11] - 1) < 1e-9 && std::fabs(sack[14] - .5) < 1e-9);
+    // Grouped references share the group like items do; missing tables add nothing.
+    auto box = ExpectedDrops({{0, 40, 1, 1, 1, 1000}, {0, 0, 1, 1, 1, 2000}, {0, 100, 0, 1, 1, 9999}}, &references);
+    assert(std::fabs(box[10] - .2) < 1e-9 && std::fabs(box[12] - 2.4) < 1e-9 && box.size() == 3);
+    // Without the reference store, reference rows are skipped; reference loops stop.
+    assert(ExpectedDrops({{0, 100, 0, 1, 1, 1000}}).empty());
+    auto loop = ExpectedDrops({{0, 100, 0, 1, 1, 3000}}, &references);
+    assert(std::fabs(loop[13] - 8) < 1e-9);
+
+    // Container value: contents at their price plus the money roll.
+    auto price = [](std::uint32_t item) { return item == 10 ? 1000.0 : item == 11 ? -5.0 : std::nan(""); };
+    assert(ContainerValue({{10, 1.5}, {11, 2}, {12, 3}}, 0, 0, price) == 1500);
+    assert(ContainerValue({}, 100, 300, price) == 200);
+    assert(ContainerValue({{10, 1}}, 500, 200, price) == 1200);
+
     // Placeholder names.
     for (char const* name : {"Unused Red Leather C03 Gloves", "Durability Gloves", "Monster - Fire Arrow",
         "Deprecate Snare Kit", "90 Green Warrior Axe", "63 Green Rogue Belt", "Red Leather C03 Boots",
