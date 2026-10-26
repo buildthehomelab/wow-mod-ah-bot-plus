@@ -1198,14 +1198,16 @@ uint64 AuctionHouseBot::GetPricingErrorPrice(ItemTemplate const* proto, uint32 h
 }
 
 // Buyer offers from the buyer reference. BiS items use their own percent and fail closed;
-// with Buyer.ReferencePricing every other item the seller quotes follows too, and items
-// without a seller quote stay on the legacy random buyer.
+// with Buyer.ReferencePricing every other item the seller quotes follows too (crafts at
+// CraftedMarketPercent, so the crafting margin is the crafter's), and items without a seller
+// quote stay on the legacy random buyer.
 bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer, bool ignoreDailyLimit)
 {
     offer = 0;
     bool const bis = ProgressionBuyerPricingEnabled && AhBotPricing::IsProgressionBis(item);
     bool const active = BuyingBotEnabled && BuyingBotBuyCandidatesPerBuyCycleMax != 0;
     uint64 reference = 0;
+    bool crafted = false;
     if (bis)
     {
         // Targeted items fail closed if the corresponding reference/buyer is unavailable.
@@ -1219,7 +1221,7 @@ bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uin
         // No seller quote: legacy buyer. A quoted item whose reference is 0 gets no offer.
         if (!ReferenceBuyerPricingEnabled || !active || !GetSellerQuote(item, house))
             return false;
-        reference = GetBuyerReference(item, house);
+        reference = GetBuyerReference(item, house, false, &crafted);
     }
     auto proto = sObjectMgr->GetItemTemplate(item);
     if (!proto || proto->Bonding == BIND_WHEN_PICKED_UP || proto->Bonding == BIND_QUEST_ITEM
@@ -1228,8 +1230,9 @@ bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uin
     // Capped by the NPC price, so buying from a vendor to sell to the bot always loses gold
     // (bags are not in the map; their seller price is already capped below the NPC's).
     auto npc = VendorPurchasePrices.find(item);
-    offer = AhBotPricing::ReferenceBuyerOffer(reference, bis ? ProgressionBuyerMarketPercent : ReferenceBuyerMarketPercent,
-        npc == VendorPurchasePrices.end() ? 0 : npc->second);
+    uint32 percent = bis ? ProgressionBuyerMarketPercent
+        : crafted ? ReferenceBuyerCraftedMarketPercent : ReferenceBuyerMarketPercent;
+    offer = AhBotPricing::ReferenceBuyerOffer(reference, percent, npc == VendorPurchasePrices.end() ? 0 : npc->second);
     uint32 vendor = item < vendorItemsPrices.size() ? vendorItemsPrices[item] : UINT32_MAX;
     if (PreventOverpayingForVendorItems && vendor > 0 && vendor != UINT32_MAX)
         offer = std::min<std::uint64_t>(offer, vendor);
@@ -1314,8 +1317,8 @@ void AuctionHouseBot::RebuildSellerCatalog()
 
 // What the reference buyers pay from: the seller quote, but never more than a crafted item's
 // cost basis, so seller-only floors (epic gear, glyphs, BiS demand) and specialization extras
-// can't turn crafting for the bot into gold.
-uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house, bool bisPremium)
+// can't turn crafting for the bot into gold beyond the crafting margin. crafted: a floored craft.
+uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house, bool bisPremium, bool* crafted)
 {
     uint64 quote = GetSellerQuote(item, house);
     if (!quote)
@@ -1324,7 +1327,12 @@ uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house, bool bisPre
     AhBotPricing::Model const* model = entry ? GetCraftedPricingModel(entry) : nullptr;
     if (!model)
         return 0;
-    double cost = model->Get(item).buyer;
+    AhBotPricing::Price const price = model->Get(item);
+    double cost = price.buyer;
+    // Only crafts the seller floors: their bot listings, bids included, never go below the
+    // cost basis, so a full share can't be had by winning a bot auction and selling it back.
+    if (crafted)
+        *crafted = cost >= 0 && price.floor > 0;
     if (bisPremium)
         return AhBotPricing::BisCraftReference(quote, cost, ProgressionBisMultiplier);
     return cost >= 0 ? std::min<uint64>(quote, uint64(cost)) : quote;
@@ -3109,6 +3117,9 @@ void AuctionHouseBot::InitializeConfiguration()
     ReferenceBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ReferencePricing.MarketPercent", 80);
     if (ReferenceBuyerMarketPercent == 0 || ReferenceBuyerMarketPercent >= 100)
         ReferenceBuyerMarketPercent = 80;
+    ReferenceBuyerCraftedMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ReferencePricing.CraftedMarketPercent", 100);
+    if (ReferenceBuyerCraftedMarketPercent == 0 || ReferenceBuyerCraftedMarketPercent > 100)
+        ReferenceBuyerCraftedMarketPercent = 100;
     AhBotPriceCatalog::buyerProvider = [](std::uint32_t item, std::uint32_t house, std::uint64_t& offer) {
         return auctionbot->GetReferenceBuyerOffer(item, house, offer);
     };

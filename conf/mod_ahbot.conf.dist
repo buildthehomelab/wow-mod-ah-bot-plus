@@ -1285,6 +1285,13 @@ AuctionHouseBot.Buyer.ProgressionPricing.DailyLimit = 2
 # not applied. Buyer.ProgressionPricing (BiS) uses the same reference with its own percent,
 # the BiS premium put back and a daily limit.
 AuctionHouseBot.Buyer.ReferencePricing.Enabled = false
-# Integer range 1..99; invalid values fall back to 80. Above ~87 crafting from bot-priced
-# materials and selling to the bot makes gold (15% crafting margin).
+# Integer range 1..99; invalid values fall back to 80. Applies to items without a recipe
+# (drops, gathered materials).
 AuctionHouseBot.Buyer.ReferencePricing.MarketPercent = 80
+# The same share for crafts with a seller floor (CraftedPricing on; materials that are also
+# gathered have none and use MarketPercent), of their capped reference (making cost plus
+# CraftedPricing.ProfitMargin and the cut). Integer range 1..100; invalid values fall back
+# to 100. At 100 a craft made from bot-priced materials returns the full crafting margin
+# after the cut (15% by default); at ~87 it breaks even. Never above the seller quote, so
+# buying the bot's own listing and selling it back still loses the cut.
+AuctionHouseBot.Buyer.ReferencePricing.CraftedMarketPercent = 100

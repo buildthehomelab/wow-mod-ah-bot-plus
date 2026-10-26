@@ -201,6 +201,7 @@ private:
     bool BisDailyBuysLoaded = false;
     bool ReferenceBuyerPricingEnabled = false;
     uint32 ReferenceBuyerMarketPercent = 80;
+    uint32 ReferenceBuyerCraftedMarketPercent = 100;
     bool ReturnExpiredAuctionItemsToBot;
     uint32 CyclesBetweenBuyActionMin;
     uint32 CyclesBetweenBuyAction;
@@ -444,7 +445,7 @@ public:
     std::vector<std::string> GetStatus();
     uint64 GetSellerQuote(uint32 item, uint32 house);
     bool GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer, bool ignoreDailyLimit = false);
-    uint64 GetBuyerReference(uint32 item, uint32 house, bool bisPremium = false);
+    uint64 GetBuyerReference(uint32 item, uint32 house, bool bisPremium = false, bool* crafted = nullptr);
     uint64 GetPricingErrorPrice(ItemTemplate const* proto, uint32 house);
     void RebuildSellerCatalog();
     void LoadBisDailyBuys();

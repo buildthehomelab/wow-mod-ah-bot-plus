@@ -313,9 +313,13 @@ cheapest of the bot reference, an NPC's gold price and crafting each ingredient,
 yield (die rolls and specialization extras from `skill_extra_item_template`, assuming every
 specialization is known). Seller-only floors (epic gear, glyphs) never reach the buyer for
 craftable items, and the BiS demand premium only through the capped BiS buyer (see BiS buyer
-pricing), so crafting for the bot can't mint gold without limit: at 80% a craft
-returns about 92% of its ingredients' cost after the cut (break-even is about 87%). The offer
-also never exceeds `MarketPercent`% of what an NPC charges for the item, and pricing-error stacks
+pricing). Crafts the seller floors (`CraftedPricing`; not materials that are also gathered,
+whose bot bids can sit below the cost basis) get their own share, `CraftedMarketPercent`
+(default 100), so selling a
+craft to the bot earns the crafting margin: 15% over its ingredients' cost after the cut at
+100%, break-even at about 87%. Professions make gold, but no more than that margin per craft
+(BiS crafts add their premium, under a daily limit). Items without a recipe use
+`MarketPercent` (default 80). The offer also never exceeds `MarketPercent`% of what an NPC charges for the item, and pricing-error stacks
 never list below the buyer's offer, so neither can be flipped to the bot.
 PreventOverpayingForVendorItems still applies when set. Items sold only for tokens are not capped:
 a token-vendor epic sells to the bot like a drop.

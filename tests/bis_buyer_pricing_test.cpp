@@ -20,7 +20,8 @@ int main()
     assert(!WithinBisBuyerOffer(offer, offer, 0));
     assert(BisBuyerOffer(0, 90) == 0);
     assert(BisBuyerOffer(reference, 0) == 0);
-    assert(BisBuyerOffer(reference, 100) == 0);
+    assert(BisBuyerOffer(reference, 100) == reference); // Crafted share: never above the reference.
+    assert(BisBuyerOffer(reference, 101) == 0);
     assert(BisBuyerOffer(std::uint64_t(UINT32_MAX) + 1, 90) == 0);
     assert(BisBuyerOffer(1001, 90) == 900); // Exact integer floor, no float rounding drift.
     assert(BisBuyerOffer(UINT32_MAX, 90) == std::uint64_t(UINT32_MAX) * 90 / 100);
@@ -40,6 +41,17 @@ int main()
     assert(ReferenceBuyerOffer(0, 80, 1000) == 0);
     // Buying from the NPC and selling to the bot always loses gold, even before the cut.
     assert(ReferenceBuyerOffer(5000000, 99, 1234) < 1234);
+    assert(ReferenceBuyerOffer(5000000, 100, 1234) == 1234); // At 100%: the cut makes it a loss.
+
+    // Crafts at 100% of their capped reference keep the 15% margin after the 5% cut.
+    {
+        constexpr double materials = 1000000; // 100g of bot-priced ingredients.
+        auto craftReference = std::uint64_t(std::ceil(materials * 1.15 / .95));
+        auto proceeds = std::uint64_t(std::floor(ReferenceBuyerOffer(craftReference, 100, 0) * .95));
+        assert(proceeds >= 1149999 && proceeds <= 1150001);
+        // At the 80% share for drops the same craft returned ~92%: the faucet guard it replaces.
+        assert(std::uint64_t(ReferenceBuyerOffer(craftReference, 80, 0) * .95) < materials);
+    }
     // BiS crafts pay making cost with the 1.5x premium: Lionheart Helm, ~539g of materials.
     constexpr double lionheartCost = 6520000; // ~652g: 539g x 1.15 / 0.95.
     auto lionheart = BisCraftReference(13004000, lionheartCost, 1.5);
