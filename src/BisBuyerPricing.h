@@ -40,6 +40,12 @@ namespace AhBotPricing
         return !limit || (count.day == day ? count.units : 0) + std::uint64_t(units) <= limit;
     }
 
+    inline std::uint32_t DailyLeft(DailyCount const& count, std::int64_t day, std::uint32_t limit)
+    {
+        std::uint32_t used = count.day == day ? count.units : 0;
+        return used < limit ? limit - used : 0;
+    }
+
     inline void DailyRecord(DailyCount& count, std::int64_t day, std::uint32_t units)
     {
         if (count.day != day)

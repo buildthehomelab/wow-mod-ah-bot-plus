@@ -56,7 +56,9 @@ int main()
     DailyRecord(day, 100, 1);
     assert(!DailyAllows(day, 100, 1, 2) && DailyAllows(day, 100, 1, 0));
     assert(DailyAllows(day, 101, 2, 2) && !DailyAllows(day, 101, 3, 2));
+    assert(DailyLeft(day, 100, 2) == 0 && DailyLeft(day, 101, 2) == 2 && DailyLeft(DailyCount{}, 5, 3) == 3);
     DailyRecord(day, 101, 1);
+    assert(DailyLeft(day, 101, 2) == 1 && DailyLeft(day, 101, 1) == 0);
     assert(day.day == 101 && day.units == 1 && DailyAllows(day, 101, 1, 2) && !DailyAllows(day, 101, 2, 2));
 
     // At 80%, a craft from bot-priced ingredients returns about 92% after the 5% cut.

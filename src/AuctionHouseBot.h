@@ -190,6 +190,9 @@ private:
     // (house, item) -> BiS units bought today, mirrored to mod_ahbot_bis_daily_buys.
     std::map<std::pair<uint32, uint32>, AhBotPricing::DailyCount> BisDailyBuys;
     bool BisDailyAllows(uint32 house, uint32 item, uint32 units) const;
+public:
+    bool GetBisDailyStatus(uint32 item, uint32 house, uint32& left, uint32& limit, uint32& resetSeconds);
+private:
     void RecordBisDailyBuy(uint32 house, uint32 item, uint32 units, CharacterDatabaseTransaction trans);
     bool BisDailyBuysLoaded = false;
     bool ReferenceBuyerPricingEnabled = false;

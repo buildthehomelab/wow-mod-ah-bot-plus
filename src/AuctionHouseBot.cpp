@@ -1300,6 +1300,23 @@ void AuctionHouseBot::RecordBisDailyBuy(uint32 house, uint32 item, uint32 units,
         "`day` = GREATEST(`day`, new.`day`)", house, item, today, units);
 }
 
+// For RetailAH's hint: how many more of a BiS item the bot takes today. Only items it would
+// buy without the limit count, so an item it never buys doesn't read as "used up".
+bool AuctionHouseBot::GetBisDailyStatus(uint32 item, uint32 house, uint32& left, uint32& limit, uint32& resetSeconds)
+{
+    left = limit = resetSeconds = 0;
+    std::uint64_t offer = 0;
+    if (!ProgressionBuyerPricingEnabled || !ProgressionBuyerDailyLimit || !AhBotPricing::IsProgressionBis(item)
+        || !GetReferenceBuyerOffer(item, house, offer, true) || !offer)
+        return false;
+    time_t now = time(nullptr);
+    auto it = BisDailyBuys.find({house, item});
+    limit = ProgressionBuyerDailyLimit;
+    left = AhBotPricing::DailyLeft(it == BisDailyBuys.end() ? AhBotPricing::DailyCount{} : it->second, now / DAY, limit);
+    resetSeconds = uint32(DAY - now % DAY);
+    return true;
+}
+
 bool AuctionHouseBot::BisDailyAllows(uint32 house, uint32 item, uint32 units) const
 {
     auto it = BisDailyBuys.find({house, item});
@@ -3032,6 +3049,10 @@ void AuctionHouseBot::InitializeConfiguration()
         ReferenceBuyerMarketPercent = 80;
     AhBotPriceCatalog::buyerProvider = [](std::uint32_t item, std::uint32_t house, std::uint64_t& offer) {
         return auctionbot->GetReferenceBuyerOffer(item, house, offer);
+    };
+    AhBotPriceCatalog::bisDailyProvider = [](std::uint32_t item, std::uint32_t house, std::uint32_t& left,
+        std::uint32_t& limit, std::uint32_t& resetSeconds) {
+        return auctionbot->GetBisDailyStatus(item, house, left, limit, resetSeconds);
     };
     AhBotPriceCatalog::provider = [](std::uint32_t item, std::uint32_t house) -> std::uint64_t {
         return auctionbot->GetSellerQuote(item, house);
