@@ -1251,7 +1251,8 @@ AuctionHouseBot.Buyer.ProgressionPricing.Enabled = false
 AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90
 # Craftable BiS items pay making cost plus margin times ProgressionPricing.BisMultiplier, so
 # crafting BiS for the bot is worth it. This caps how many units of each BiS item the bot buys
-# or bids on per house per server day (UTC, reset on restart). 0 = no limit, max 10000.
+# or bids on per house per server day (UTC; kept in the characters DB table
+# mod_ahbot_bis_daily_buys, so restarts don't reset it). 0 = no limit, max 10000.
 AuctionHouseBot.Buyer.ProgressionPricing.DailyLimit = 2
 
 # Reference buyer offers for every item, not only BiS: floor(reference * MarketPercent / 100)

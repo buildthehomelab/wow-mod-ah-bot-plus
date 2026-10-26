@@ -1268,6 +1268,38 @@ uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house, bool bisPre
     return cost >= 0 ? std::min<uint64>(quote, uint64(cost)) : quote;
 }
 
+// Today's BiS counts from the characters DB, the first time the limit is on; older days are
+// dropped. Only touched while the limit is on: a missing table is fatal to the DB layer.
+void AuctionHouseBot::LoadBisDailyBuys()
+{
+    BisDailyBuysLoaded = true;
+    BisDailyBuys.clear();
+    int64 today = time(nullptr) / DAY;
+    CharacterDatabase.Execute("DELETE FROM `mod_ahbot_bis_daily_buys` WHERE `day` < {}", today);
+    QueryResult result = CharacterDatabase.Query("SELECT `house`, `item`, `units` FROM `mod_ahbot_bis_daily_buys` WHERE `day` = {}", today);
+    if (!result)
+        return;
+    do
+    {
+        Field* fields = result->Fetch();
+        BisDailyBuys[{fields[0].Get<uint32>(), fields[1].Get<uint32>()}] = {today, fields[2].Get<uint32>()};
+    } while (result->NextRow());
+    LOG_INFO("module", "AuctionHouseBot: Loaded {} BiS daily buy counts for today", BisDailyBuys.size());
+}
+
+// Counts in memory and, in the purchase's own transaction, in the DB. The upsert adds to the
+// stored day, so writes landing out of order on several DB workers can't lose units.
+void AuctionHouseBot::RecordBisDailyBuy(uint32 house, uint32 item, uint32 units, CharacterDatabaseTransaction trans)
+{
+    int64 today = time(nullptr) / DAY;
+    AhBotPricing::DailyRecord(BisDailyBuys[{house, item}], today, units);
+    if (!ProgressionBuyerDailyLimit)
+        return;
+    trans->Append("INSERT INTO `mod_ahbot_bis_daily_buys` (`house`, `item`, `day`, `units`) VALUES ({}, {}, {}, {}) AS new "
+        "ON DUPLICATE KEY UPDATE `units` = IF(new.`day` > `day`, new.`units`, IF(new.`day` = `day`, `units` + new.`units`, `units`)), "
+        "`day` = GREATEST(`day`, new.`day`)", house, item, today, units);
+}
+
 bool AuctionHouseBot::BisDailyAllows(uint32 house, uint32 item, uint32 units) const
 {
     auto it = BisDailyBuys.find({house, item});
@@ -2715,8 +2747,8 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         else if (!doBid && !doBuyout)
             ++stats.tooExpensive;
         // Bids count too: a bot bid is a promise to buy, even if a player outbids it later.
-        if ((doBid || doBuyout) && bisLimited)
-            AhBotPricing::DailyRecord(BisDailyBuys[{config->GetAHID(), prototype->ItemId}], time(nullptr) / DAY, pItem->GetCount());
+        bool const recordBis = (doBid || doBuyout) && bisLimited;
+        uint32 const units = pItem->GetCount();
 
         if (debug_Out)
         {
@@ -2758,6 +2790,8 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         {
             ++stats.bids;
             auto trans = CharacterDatabase.BeginTransaction();
+            if (recordBis)
+                RecordBisDailyBuy(config->GetAHID(), prototype->ItemId, units, trans);
 
             if (auction->bidder)
                 sAuctionMgr->SendAuctionOutbiddedMail(auction, calcBidAmount, AHBplayer, trans);
@@ -2779,6 +2813,8 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         {
             ++stats.purchases;
             auto trans = CharacterDatabase.BeginTransaction();
+            if (recordBis)
+                RecordBisDailyBuy(config->GetAHID(), prototype->ItemId, units, trans);
 
             if ((auction->bidder) && (AHBplayer->GetGUID() != auction->bidder))
                 sAuctionMgr->SendAuctionOutbiddedMail(auction, auction->buyout, AHBplayer, trans);
@@ -2987,6 +3023,9 @@ void AuctionHouseBot::InitializeConfiguration()
     ProgressionBuyerDailyLimit = std::min(10000u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ProgressionPricing.DailyLimit", 2));
     if (ProgressionBuyerPricingEnabled && !ProgressionBuyerDailyLimit)
         LOG_WARN("module", "AuctionHouseBot: Buyer.ProgressionPricing.DailyLimit is 0: the BiS buyer pays the BiS premium on crafts without limit");
+    // Config loads after the DB connects, and a reload that turns the limit on loads it too.
+    if (ProgressionBuyerPricingEnabled && ProgressionBuyerDailyLimit && !BisDailyBuysLoaded)
+        LoadBisDailyBuys();
     ReferenceBuyerPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.ReferencePricing.Enabled", false);
     ReferenceBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ReferencePricing.MarketPercent", 80);
     if (ReferenceBuyerMarketPercent == 0 || ReferenceBuyerMarketPercent >= 100)

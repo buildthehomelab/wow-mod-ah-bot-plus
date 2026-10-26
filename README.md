@@ -275,8 +275,10 @@ no epic floor), so crafting BiS pays like BiS. At 1.5 and 90% a craft returns ab
 materials after the cut (Lionheart Helm: ~539g of materials, ~880g offer). Because the bot's
 material stock could feed that forever, `Buyer.ProgressionPricing.DailyLimit` (default 2) caps
 how many units of each BiS item the bot buys or bids on per house per server day (UTC); past it
-the item gets no offer until the next day. The count lives in memory, so a restart starts the
-day over. 0 removes the limit. Dropped BiS items keep the full seller reference.
+the item gets no offer until the next day. The count is kept in the characters DB table
+`mod_ahbot_bis_daily_buys` (`data/sql/db-characters/base`, written in each purchase's own transaction
+and only used while the limit is on; needs MySQL 8.0.19+ for its upsert), so restarts don't reset
+it. 0 removes the limit. Dropped BiS items keep the full seller reference.
 This is not a guarantee for every recipe, live material availability or arbitrary player material asks.
 
 Buying still follows configured buyer cycles/candidate limits and normal mail delivery. It
