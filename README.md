@@ -154,7 +154,7 @@ c++ -std=c++17 -Wall -Wextra -Werror tests/recipe_pricing_test.cpp -o /tmp/recip
 /tmp/recipe-pricing-test
 ```
 
-### Mounts, epic gear, glyphs, ammo, vendor and disenchant floors
+### Mounts, epic gear, glyphs, ammo, vendor, disenchant and container floors
 
 Each is off by default; see `conf/mod_ahbot.conf.dist` for the keys.
 
@@ -169,6 +169,9 @@ Each is off by default; see `conf/mod_ahbot.conf.dist` for the keys.
   (bags excepted), so the AH doesn't undercut vendor gold sinks.
 - `DisenchantFloor`: disenchantable gear never lists below the expected value of its
   disenchant materials at the bot's own prices.
+- `ContainerFloor`: openable items (lockboxes, sacks of gems, clams) never list below the
+  expected value of their contents (`item_loot_template`, references followed) at the
+  bot's own prices, plus their money loot; soulbound contents count at vendor price.
 - `ListingCap.MaxPerItem`: the most copies of one item random filling keeps in a house,
   so a class/quality bucket with only a few items can't flood it.
 

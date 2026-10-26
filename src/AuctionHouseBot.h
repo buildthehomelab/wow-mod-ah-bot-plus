@@ -177,6 +177,10 @@ private:
     uint32 DisenchantFloorPercent = 100;
     // DisenchantID -> (material, expected units per disenchant).
     std::unordered_map<uint32, std::vector<std::pair<uint32, double>>> DisenchantYields;
+    bool ContainerFloorEnabled = false;
+    uint32 ContainerFloorPercent = 100;
+    // Openable item -> content -> expected units per opening (empty for money-only items).
+    std::unordered_map<uint32, std::map<uint32, double>> ContainerContents;
     double GetCategoryFloor(ItemTemplate const* proto) const;
     void PopulateCraftedPricing();
     double GetCraftedPricingCut(AuctionHouseEntry const* house) const;
