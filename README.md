@@ -104,9 +104,9 @@ exceeds `AuctionHouseBot.MaxBuyoutPriceInCopper` (or uint32 auction money capaci
 are skipped, and stack sizes are reduced when required to fit the auction's money fields.
 
 The feature defaults off and preserves the legacy RNG/pricing path when disabled.
-It affects the seller only. The buyer intentionally keeps its legacy willingness to
-pay; seller price increases do not automatically raise buyer payouts. Buyer economics
-and vendor resale arbitrage are separate from this setting.
+It affects the seller only. The legacy buyer keeps its willingness to pay; seller price
+increases do not raise its payouts. The reference buyers (see reference buyer pricing) pay
+from crafting cost instead, whichever floors the seller adds.
 
 Existing auctions retain their recorded prices. After enabling the feature in the module
 configuration, plan an explicit refresh of existing bot auctions. `.ahbot empty` removes bot auctions
@@ -271,15 +271,50 @@ cannot raise the reference. AcceptablePriceModifier is not multiplied into this 
 The actual buying path and optional shared `BuyerOffer` API use the same method. Vendor
 and zero-vendor-price guards apply, and targeted vendor caps are per unit for stacks. Bid
 totals remain within uint32 auction money limits. Exact-threshold buyouts are accepted; one
-copper above the stack offer is not. The reference still includes crafting floors and BiS
-demand. A 15% crafting floor and 90% offer leave about 3.5% after the matching auction cut
-before deposits and copper rounding, with more where a demand premium dominates. This is
-not a guarantee for every recipe, live material availability or arbitrary player material asks.
+copper above the stack offer is not. The offer comes from the buyer reference described under
+reference buyer pricing, with the BiS demand premium put back: a craftable BiS item counts its
+making cost plus the 15% margin times `ProgressionPricing.BisMultiplier` (never above its listing,
+no epic floor), so crafting BiS pays like BiS. At 1.5 and 90% a craft returns about 1.55x its
+materials after the cut (Lionheart Helm: ~539g of materials, ~880g offer). Because the bot's
+material stock could feed that forever, `Buyer.ProgressionPricing.DailyLimit` (default 2) caps
+how many units of each BiS item the bot buys or bids on per house per server day (UTC); past it
+the item gets no offer until the next day. RetailAH shows how many are left today (and when
+the limit resets) through `AhBotPriceCatalog::BisDaily` (`AH_BOT_PRICE_CATALOG_BIS_DAILY_V1`).
+The count is kept in the characters DB table
+`mod_ahbot_bis_daily_buys` (`data/sql/db-characters/base`, written in each purchase's own transaction
+and only used while the limit is on; needs MySQL 8.0.19+ for its upsert), so restarts don't reset
+it. 0 removes the limit. Dropped BiS items keep the full seller reference.
+This is not a guarantee for every recipe, live material availability or arbitrary player material asks.
 
 Buying still follows configured buyer cycles/candidate limits and normal mail delivery. It
 is not an instant-sale endpoint. Existing lower-priced bot stock should be refreshed during
 the rebuild. Use matching RetailAH and RetailProfessions versions so displayed
 offers and BiS craft profits agree with actual buying behavior. No SQL/client patch is needed.
+
+## Reference buyer pricing (all items)
+
+Every seller floor (crafting, vendor, disenchant, epic gear, glyph, recipe, container pricing) is seller
+only, so without this the buyer offers the bare category formula: a crafted item can list at
+hundreds of times what the bot will pay for it. `AuctionHouseBot.Buyer.ReferencePricing.Enabled
+= true` makes the buyer offer floor(`MarketPercent`% of the buyer reference) per unit for every
+item the seller quotes. BiS items keep their own percent. Items the seller never lists (no
+seller quote) stay on the legacy buyer. Needs `EnableSeller`, `Seller.StablePrices` and an
+active buyer; a house the seller doesn't stock (MaxItems 0) has no quotes. AcceptablePriceModifier
+is not applied.
+
+The buyer reference is the seller quote, except for anything with a recipe (professions and
+item-use combines such as Darkmoon decks or motes into primals): those count at most what one
+unit costs to make, plus the 15% crafting margin and the auction cut. That cost takes the
+cheapest of the bot reference, an NPC's gold price and crafting each ingredient, at average
+yield (die rolls and specialization extras from `skill_extra_item_template`, assuming every
+specialization is known). Seller-only floors (epic gear, glyphs) never reach the buyer for
+craftable items, and the BiS demand premium only through the capped BiS buyer (see BiS buyer
+pricing), so crafting for the bot can't mint gold without limit: at 80% a craft
+returns about 92% of its ingredients' cost after the cut (break-even is about 87%). The offer
+also never exceeds `MarketPercent`% of what an NPC charges for the item, and pricing-error stacks
+never list below the buyer's offer, so neither can be flipped to the bot.
+PreventOverpayingForVendorItems still applies when set. Items sold only for tokens are not capped:
+a token-vendor epic sells to the bot like a drop.
 
 ## Crafting material supply
 
@@ -337,7 +372,8 @@ Opt-in `MaterialStock.PricingErrors.Enabled` occasionally lists **one** random m
 stack at the NPC **sell** value per unit. `VendorPercent=100` means exactly that value;
 1..99 permits lower prices, rounded to at least 1 copper. No-vendor-value materials are
 excluded. This deliberate listing-only exception bypasses recipe floors; normal shared
-reference quotes and buyer valuations remain unchanged. The default is a 5% chance per
+reference quotes and buyer valuations remain unchanged. With a reference buyer the stack never
+lists below what that buyer pays per unit, so it can't be relisted to the bot at a profit. The default is a 5% chance per
 eligible sell cycle after a 60-minute per-house cooldown, with at most one deliberate live
 pricing-error listing. Any live or queued vendor-value-or-less normal bot supply
 suppresses a new pricing-error event; normal supply itself is not restricted by

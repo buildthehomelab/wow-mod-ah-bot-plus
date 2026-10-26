@@ -23,7 +23,9 @@
 
 #include "Common.h"
 #include "ObjectGuid.h"
+#include "DatabaseEnvFwd.h"
 #include "CraftingPricing.h"
+#include "BisBuyerPricing.h"
 #include "BagPricing.h"
 #include "RecipePricing.h"
 #include <array>
@@ -135,7 +137,7 @@ private:
     struct BuyerStats
     {
         uint64 cycles = 0, considered = 0, purchases = 0, bids = 0;
-        uint64 ineligible = 0, missing = 0, noOffer = 0, vendorLimited = 0, tooExpensive = 0;
+        uint64 ineligible = 0, missing = 0, noOffer = 0, vendorLimited = 0, tooExpensive = 0, dailyLimited = 0;
         time_t lastCycle = 0;
     };
     std::map<uint32, BuyerStats> BuyerStatistics;
@@ -181,11 +183,24 @@ private:
     std::unordered_map<uint32, std::map<uint32, double>> ContainerContents;
     double GetCategoryFloor(ItemTemplate const* proto) const;
     void PopulateCraftedPricing();
+    double GetCraftedPricingCut(AuctionHouseEntry const* house) const;
+    AhBotPricing::Model const* GetCraftedPricingModel(AuctionHouseEntry const* house);
     bool ApplyCraftedPricing(ItemTemplate const* proto, AuctionHouseEntry const* house, uint64& bid, uint64& buyout);
     bool SellingBotEnabled;
     bool BuyingBotEnabled;
     bool ProgressionBuyerPricingEnabled = false;
     uint32 ProgressionBuyerMarketPercent = 90;
+    uint32 ProgressionBuyerDailyLimit = 2;
+    // (house, item) -> BiS units bought today, mirrored to mod_ahbot_bis_daily_buys.
+    std::map<std::pair<uint32, uint32>, AhBotPricing::DailyCount> BisDailyBuys;
+    bool BisDailyAllows(uint32 house, uint32 item, uint32 units) const;
+public:
+    bool GetBisDailyStatus(uint32 item, uint32 house, uint32& left, uint32& limit, uint32& resetSeconds);
+private:
+    void RecordBisDailyBuy(uint32 house, uint32 item, uint32 units, CharacterDatabaseTransaction trans);
+    bool BisDailyBuysLoaded = false;
+    bool ReferenceBuyerPricingEnabled = false;
+    uint32 ReferenceBuyerMarketPercent = 80;
     bool ReturnExpiredAuctionItemsToBot;
     uint32 CyclesBetweenBuyActionMin;
     uint32 CyclesBetweenBuyAction;
@@ -428,8 +443,11 @@ private:
 public:
     std::vector<std::string> GetStatus();
     uint64 GetSellerQuote(uint32 item, uint32 house);
-    bool GetProgressionBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
+    bool GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer, bool ignoreDailyLimit = false);
+    uint64 GetBuyerReference(uint32 item, uint32 house, bool bisPremium = false);
+    uint64 GetPricingErrorPrice(ItemTemplate const* proto, uint32 house);
     void RebuildSellerCatalog();
+    void LoadBisDailyBuys();
     void PopulateMaterialStock();
 
     static AuctionHouseBot* instance()
