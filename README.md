@@ -128,7 +128,7 @@ class and minimum level follow the core's enchant casting rules; the cheapest va
 vellum recipe is used. Reusable rods are not consumed. Scrolls are priced as one
 output, regardless of enchant bonus points. This closes the ordinary create-item
 scan's omission of enchanting scrolls. It does not independently raise raw material
-prices or change buyer payouts.
+prices; with a reference buyer, a scroll's making cost is also its buyer cost basis.
 
 ### Recipe items
 
@@ -139,9 +139,10 @@ its guaranteed output. Recipes for items in the progression BiS catalog use
 `BisProducedItemPercent` (default 100), so a raid BiS pattern costs about as much as
 the item it makes. Formulas follow their enchant scroll. This only raises the ordinary
 recipe quote. A recipe anyone can buy from an NPC for gold (no reputation requirement,
-unlimited stock, no token cost) never goes above that NPC price. Seller only; it runs
-on the same seller path as crafted pricing, so it needs CraftedPricing,
-ProgressionPricing or Seller.StablePrices enabled.
+unlimited stock, no token cost) never goes above that NPC price. The legacy buyer
+ignores it; the reference buyers pay their share of it. It runs on the same seller path
+as crafted pricing, so it needs CraftedPricing, ProgressionPricing or Seller.StablePrices
+enabled.
 
 With `AuctionHouseBot.Seller.SkipVendorRecipes`, the seller does not list NPC recipes
 at all: any recipe a spawned NPC sells, for gold, reputation or tokens, limited-stock
@@ -256,16 +257,19 @@ RetailAH's additive `KC` request shares these references with addons away from a
 auctioneer. They describe future bot listings, not current availability or guaranteed
 player sale proceeds. Existing auctions keep their persisted prices until refreshed.
 Both modules must be built into the same worldserver; independent dynamic libraries are
-not supported by this inline provider API. Buyer payouts are unchanged.
+not supported by this inline provider API. The legacy buyer's payouts don't use these
+quotes; the reference buyers (BiS and reference buyer pricing below) pay from them.
 
 ## BiS buyer pricing
 
 Opt in with `AuctionHouseBot.Buyer.ProgressionPricing.Enabled = true`; set
 `AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90` for an inclusive gross
-per-unit offer of floor(90% of the bot's stable seller reference). Valid integer percentages
-are 1..99; invalid values revert to 90. Stable seller pricing, progression pricing and an
-active buyer are required. Targeted BiS items without a valid seller reference fail closed;
-non-BiS items and disabled policy keep the legacy buyer calculation. Player asking prices
+per-unit offer of floor(90% of the buyer reference): the bot's stable seller reference, or
+for a craftable BiS item its making cost plus margin times the BiS premium when lower (see
+below). Valid integer percentages are 1..99; invalid values revert to 90. Stable seller
+pricing, progression pricing and an active buyer are required. Targeted BiS items without a
+valid seller reference fail closed; non-BiS quoted items follow reference buyer pricing when
+it is on, and otherwise (or with this policy off) keep the legacy buyer calculation. Player asking prices
 cannot raise the reference. AcceptablePriceModifier is not multiplied into this new offer.
 
 The actual buying path and optional shared `BuyerOffer` API use the same method. Vendor
@@ -293,8 +297,8 @@ offers and BiS craft profits agree with actual buying behavior. No SQL/client pa
 
 ## Reference buyer pricing (all items)
 
-Every seller floor (crafting, vendor, disenchant, epic gear, glyph, recipe, container pricing) is seller
-only, so without this the buyer offers the bare category formula: a crafted item can list at
+Every seller floor (crafting, vendor, disenchant, epic gear, glyph, ammo, recipe, container
+pricing) is seller only, so without this the buyer offers the bare category formula: a crafted item can list at
 hundreds of times what the bot will pay for it. `AuctionHouseBot.Buyer.ReferencePricing.Enabled
 = true` makes the buyer offer floor(`MarketPercent`% of the buyer reference) per unit for every
 item the seller quotes. BiS items keep their own percent. Items the seller never lists (no

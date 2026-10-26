@@ -1166,7 +1166,8 @@ AuctionHouseBot.CraftedPricing.ProfitMargin = 0.15
 # catalog in data/progression-bis/. Applied once, regardless of the number of specs
 # or phases that recommend an item. Phases coexist under Individual Progression;
 # this does not gate item access or choose a realm-wide current phase.
-# Seller only; does not change buyer payouts or listing eligibility.
+# Does not change listing eligibility. The legacy buyer ignores it; the reference buyers pay
+# from the premium quote (Buyer.ProgressionPricing also puts it back on crafted BiS).
 AuctionHouseBot.ProgressionPricing.Enabled = false
 # 1.5 = 50% premium. Valid range 1..10; invalid values fall back to 1.5.
 AuctionHouseBot.ProgressionPricing.BisMultiplier = 1.5
@@ -1256,7 +1257,8 @@ AuctionHouseBot.Seller.StablePrices = false
 # BiS buyer offers from the stable buyer reference (not player asks): the seller quote, or a
 # craftable item's making cost plus margin times the BiS premium when lower.
 # Requires Buyer.Enabled, ProgressionPricing.Enabled and Seller.StablePrices.
-# Only catalogued BiS items use this policy; ordinary items retain legacy buyer RNG.
+# Only catalogued BiS items use this policy; other quoted items follow Buyer.ReferencePricing
+# when it is on, else the legacy buyer's random roll.
 # The inclusive gross per-unit offer is floor(reference * MarketPercent / 100).
 # Auction fees/deposits still apply to seller proceeds. Buyer cycles/guards still apply.
 # AcceptablePriceModifier is not applied again to this policy.
@@ -1273,14 +1275,15 @@ AuctionHouseBot.Buyer.ProgressionPricing.DailyLimit = 2
 # per unit. The reference is the stable seller quote, except that anything with a recipe
 # (professions, item-use combines) counts at most its cheapest making cost at average yield
 # plus CraftedPricing.ProfitMargin and the auction cut, so seller-only floors (epic gear,
-# glyphs, BiS demand) never reach the buyer for crafts. The offer never exceeds MarketPercent
+# glyphs, BiS demand) never reach this buyer for crafts. The offer never exceeds MarketPercent
 # of an item's NPC gold price, and pricing-error stacks never list below it. Items the seller
-# never quotes keep the legacy buyer. The floors marked "Seller only" above (vendor,
-# disenchant, epic gear, glyph, recipe, container) bind only the legacy buyer: the
-# reference buyer pays its share of the floored quote (crafts: at most their cost).
-# Requires EnableSeller, Buyer.Enabled and
-# Seller.StablePrices. AcceptablePriceModifier is not applied. Buyer.ProgressionPricing (BiS)
-# uses the same reference with its own percent, the BiS premium put back and a daily limit.
+# never quotes keep the legacy buyer. The floors and premiums above (vendor, disenchant, epic
+# gear, glyph, ammo, recipe, container, BiS), even where marked "Seller only", are ignored
+# only by the legacy buyer: the reference buyers pay their share of the floored quote
+# (crafts: at most their cost, times the BiS premium for the BiS buyer).
+# Requires EnableSeller, Buyer.Enabled and Seller.StablePrices. AcceptablePriceModifier is
+# not applied. Buyer.ProgressionPricing (BiS) uses the same reference with its own percent,
+# the BiS premium put back and a daily limit.
 AuctionHouseBot.Buyer.ReferencePricing.Enabled = false
 # Integer range 1..99; invalid values fall back to 80. Above ~87 crafting from bot-priced
 # materials and selling to the bot makes gold (15% crafting margin).
