@@ -1129,7 +1129,8 @@ uint64 AuctionHouseBot::GetPricingErrorPrice(ItemTemplate const* proto, uint32 h
 {
     uint64 price = AhBotStock::VendorBargain(proto->SellPrice, PricingErrorsVendorPercent);
     std::uint64_t offer = 0;
-    if (GetReferenceBuyerOffer(proto->ItemId, house, offer))
+    // A BiS limit reached today comes back tomorrow, so it doesn't lower the floor.
+    if (GetReferenceBuyerOffer(proto->ItemId, house, offer, true))
         price = std::max<uint64>(price, offer);
     return price;
 }
@@ -1137,7 +1138,7 @@ uint64 AuctionHouseBot::GetPricingErrorPrice(ItemTemplate const* proto, uint32 h
 // Buyer offers from the buyer reference. BiS items use their own percent and fail closed;
 // with Buyer.ReferencePricing every other item the seller quotes follows too, and items
 // without a seller quote stay on the legacy random buyer.
-bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer)
+bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer, bool ignoreDailyLimit)
 {
     offer = 0;
     bool const bis = ProgressionBuyerPricingEnabled && AhBotPricing::IsProgressionBis(item);
@@ -1146,9 +1147,10 @@ bool AuctionHouseBot::GetReferenceBuyerOffer(uint32 item, uint32 house, std::uin
     if (bis)
     {
         // Targeted items fail closed if the corresponding reference/buyer is unavailable.
-        if (!active || !ProgressionPricingEnabled)
+        // Past today's limit for this item the BiS buyer makes no offer at all.
+        if (!active || !ProgressionPricingEnabled || (!ignoreDailyLimit && !BisDailyAllows(house, item, 1)))
             return true;
-        reference = GetBuyerReference(item, house);
+        reference = GetBuyerReference(item, house, true);
     }
     else
     {
@@ -1251,7 +1253,7 @@ void AuctionHouseBot::RebuildSellerCatalog()
 // What the reference buyers pay from: the seller quote, but never more than a crafted item's
 // cost basis, so seller-only floors (epic gear, glyphs, BiS demand) and specialization extras
 // can't turn crafting for the bot into gold.
-uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house)
+uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house, bool bisPremium)
 {
     uint64 quote = GetSellerQuote(item, house);
     if (!quote)
@@ -1261,7 +1263,16 @@ uint64 AuctionHouseBot::GetBuyerReference(uint32 item, uint32 house)
     if (!model)
         return 0;
     double cost = model->Get(item).buyer;
+    if (bisPremium)
+        return AhBotPricing::BisCraftReference(quote, cost, ProgressionBisMultiplier);
     return cost >= 0 ? std::min<uint64>(quote, uint64(cost)) : quote;
+}
+
+bool AuctionHouseBot::BisDailyAllows(uint32 house, uint32 item, uint32 units) const
+{
+    auto it = BisDailyBuys.find({house, item});
+    return AhBotPricing::DailyAllows(it == BisDailyBuys.end() ? AhBotPricing::DailyCount{} : it->second,
+        time(nullptr) / DAY, units, ProgressionBuyerDailyLimit);
 }
 
 // The same deterministic seller path used for new listings, cached until config/candidates reload.
@@ -2557,7 +2568,11 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
         std::uint64_t offer = 0;
         if (GetReferenceBuyerOffer(proto->ItemId, config->GetAHID(), offer) && !offer)
         {
-            ++stats.noOffer;
+            if (ProgressionBuyerPricingEnabled && AhBotPricing::IsProgressionBis(proto->ItemId)
+                && !BisDailyAllows(config->GetAHID(), proto->ItemId, 1))
+                ++stats.dailyLimited;
+            else
+                ++stats.noOffer;
             continue;
         }
         possibleBids.push_back(auctionID);
@@ -2684,10 +2699,24 @@ void AuctionHouseBot::AddNewAuctionBuyerBotBid(std::vector<Player*> AHBPlayers, 
                 preventedOverpayingForVendorItem = true;
             }
         }
+        // Several copies (or a stack) in one cycle must still fit the BiS daily limit.
+        bool const bisLimited = referenceBuyer && ProgressionBuyerPricingEnabled
+            && AhBotPricing::IsProgressionBis(prototype->ItemId);
+        bool dailyLimited = false;
+        if ((doBid || doBuyout) && bisLimited && !BisDailyAllows(config->GetAHID(), prototype->ItemId, pItem->GetCount()))
+        {
+            doBid = doBuyout = false;
+            dailyLimited = true;
+        }
         if (preventedOverpayingForVendorItem)
             ++stats.vendorLimited;
+        else if (dailyLimited)
+            ++stats.dailyLimited;
         else if (!doBid && !doBuyout)
             ++stats.tooExpensive;
+        // Bids count too: a bot bid is a promise to buy, even if a player outbids it later.
+        if ((doBid || doBuyout) && bisLimited)
+            AhBotPricing::DailyRecord(BisDailyBuys[{config->GetAHID(), prototype->ItemId}], time(nullptr) / DAY, pItem->GetCount());
 
         if (debug_Out)
         {
@@ -2843,7 +2872,7 @@ std::vector<std::string> AuctionHouseBot::GetStatus()
         std::ostringstream rejected;
         rejected << "  Repeated scan exclusions: ineligible=" << stats.ineligible << " missing=" << stats.missing
             << " no offer=" << stats.noOffer << "; attempted rejections: vendor limit=" << stats.vendorLimited
-            << " too expensive=" << stats.tooExpensive;
+            << " too expensive=" << stats.tooExpensive << "; BiS daily limit (scans + attempts)=" << stats.dailyLimited;
         lines.push_back(rejected.str());
     }
     return lines;
@@ -2955,6 +2984,9 @@ void AuctionHouseBot::InitializeConfiguration()
     ProgressionBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent", 90);
     if (ProgressionBuyerMarketPercent == 0 || ProgressionBuyerMarketPercent >= 100)
         ProgressionBuyerMarketPercent = 90;
+    ProgressionBuyerDailyLimit = std::min(10000u, sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ProgressionPricing.DailyLimit", 2));
+    if (ProgressionBuyerPricingEnabled && !ProgressionBuyerDailyLimit)
+        LOG_WARN("module", "AuctionHouseBot: Buyer.ProgressionPricing.DailyLimit is 0: the BiS buyer pays the BiS premium on crafts without limit");
     ReferenceBuyerPricingEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.Buyer.ReferencePricing.Enabled", false);
     ReferenceBuyerMarketPercent = sConfigMgr->GetOption<uint32>("AuctionHouseBot.Buyer.ReferencePricing.MarketPercent", 80);
     if (ReferenceBuyerMarketPercent == 0 || ReferenceBuyerMarketPercent >= 100)

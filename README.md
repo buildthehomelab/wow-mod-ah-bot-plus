@@ -269,9 +269,14 @@ The actual buying path and optional shared `BuyerOffer` API use the same method.
 and zero-vendor-price guards apply, and targeted vendor caps are per unit for stacks. Bid
 totals remain within uint32 auction money limits. Exact-threshold buyouts are accepted; one
 copper above the stack offer is not. The offer comes from the buyer reference described under
-reference buyer pricing: a craftable BiS item counts its making cost plus the 15% margin, not its
-listing (no epic floor, no demand premium), so a 90% offer leaves about 3.5% after the matching
-auction cut before deposits and copper rounding. Dropped BiS items keep the full seller reference.
+reference buyer pricing, with the BiS demand premium put back: a craftable BiS item counts its
+making cost plus the 15% margin times `ProgressionPricing.BisMultiplier` (never above its listing,
+no epic floor), so crafting BiS pays like BiS. At 1.5 and 90% a craft returns about 1.55x its
+materials after the cut (Lionheart Helm: ~539g of materials, ~880g offer). Because the bot's
+material stock could feed that forever, `Buyer.ProgressionPricing.DailyLimit` (default 2) caps
+how many units of each BiS item the bot buys or bids on per house per server day (UTC); past it
+the item gets no offer until the next day. The count lives in memory, so a restart starts the
+day over. 0 removes the limit. Dropped BiS items keep the full seller reference.
 This is not a guarantee for every recipe, live material availability or arbitrary player material asks.
 
 Buying still follows configured buyer cycles/candidate limits and normal mail delivery. It
@@ -295,8 +300,9 @@ item-use combines such as Darkmoon decks or motes into primals): those count at 
 unit costs to make, plus the 15% crafting margin and the auction cut. That cost takes the
 cheapest of the bot reference, an NPC's gold price and crafting each ingredient, at average
 yield (die rolls and specialization extras from `skill_extra_item_template`, assuming every
-specialization is known). Seller-only floors (epic gear, glyphs) and the BiS demand premium never
-reach the buyer for craftable items, so crafting for the bot can't mint gold: at 80% a craft
+specialization is known). Seller-only floors (epic gear, glyphs) never reach the buyer for
+craftable items, and the BiS demand premium only through the capped BiS buyer (see BiS buyer
+pricing), so crafting for the bot can't mint gold without limit: at 80% a craft
 returns about 92% of its ingredients' cost after the cut (break-even is about 87%). The offer
 also never exceeds `MarketPercent`% of what an NPC charges for the item, and pricing-error stacks
 never list below the buyer's offer, so neither can be flipped to the bot.

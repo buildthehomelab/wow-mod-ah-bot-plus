@@ -1240,7 +1240,7 @@ AuctionHouseBot.DisenchantFloor.Percent = 100
 AuctionHouseBot.Seller.StablePrices = false
 
 # BiS buyer offers from the stable buyer reference (not player asks): the seller quote, or a
-# craftable item's making cost plus margin when lower (see Buyer.ReferencePricing).
+# craftable item's making cost plus margin times the BiS premium when lower.
 # Requires Buyer.Enabled, ProgressionPricing.Enabled and Seller.StablePrices.
 # Only catalogued BiS items use this policy; ordinary items retain legacy buyer RNG.
 # The inclusive gross per-unit offer is floor(reference * MarketPercent / 100).
@@ -1249,6 +1249,10 @@ AuctionHouseBot.Seller.StablePrices = false
 AuctionHouseBot.Buyer.ProgressionPricing.Enabled = false
 # Integer range 1..99; invalid values fall back to 90 (10% below reference).
 AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90
+# Craftable BiS items pay making cost plus margin times ProgressionPricing.BisMultiplier, so
+# crafting BiS for the bot is worth it. This caps how many units of each BiS item the bot buys
+# or bids on per house per server day (UTC, reset on restart). 0 = no limit, max 10000.
+AuctionHouseBot.Buyer.ProgressionPricing.DailyLimit = 2
 
 # Reference buyer offers for every item, not only BiS: floor(reference * MarketPercent / 100)
 # per unit. The reference is the stable seller quote, except that anything with a recipe
@@ -1258,7 +1262,7 @@ AuctionHouseBot.Buyer.ProgressionPricing.MarketPercent = 90
 # of an item's NPC gold price, and pricing-error stacks never list below it. Items the seller
 # never quotes keep the legacy buyer. Requires EnableSeller, Buyer.Enabled and
 # Seller.StablePrices. AcceptablePriceModifier is not applied. Buyer.ProgressionPricing (BiS)
-# uses the same reference with its own percent.
+# uses the same reference with its own percent, the BiS premium put back and a daily limit.
 AuctionHouseBot.Buyer.ReferencePricing.Enabled = false
 # Integer range 1..99; invalid values fall back to 80. Above ~87 crafting from bot-priced
 # materials and selling to the bot makes gold (15% crafting margin).

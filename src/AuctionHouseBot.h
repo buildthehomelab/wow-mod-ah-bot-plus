@@ -24,6 +24,7 @@
 #include "Common.h"
 #include "ObjectGuid.h"
 #include "CraftingPricing.h"
+#include "BisBuyerPricing.h"
 #include "BagPricing.h"
 #include "RecipePricing.h"
 #include <array>
@@ -135,7 +136,7 @@ private:
     struct BuyerStats
     {
         uint64 cycles = 0, considered = 0, purchases = 0, bids = 0;
-        uint64 ineligible = 0, missing = 0, noOffer = 0, vendorLimited = 0, tooExpensive = 0;
+        uint64 ineligible = 0, missing = 0, noOffer = 0, vendorLimited = 0, tooExpensive = 0, dailyLimited = 0;
         time_t lastCycle = 0;
     };
     std::map<uint32, BuyerStats> BuyerStatistics;
@@ -184,6 +185,10 @@ private:
     bool BuyingBotEnabled;
     bool ProgressionBuyerPricingEnabled = false;
     uint32 ProgressionBuyerMarketPercent = 90;
+    uint32 ProgressionBuyerDailyLimit = 2;
+    // (house, item) -> BiS units bought today; in memory, so a restart starts the day over.
+    std::map<std::pair<uint32, uint32>, AhBotPricing::DailyCount> BisDailyBuys;
+    bool BisDailyAllows(uint32 house, uint32 item, uint32 units) const;
     bool ReferenceBuyerPricingEnabled = false;
     uint32 ReferenceBuyerMarketPercent = 80;
     bool ReturnExpiredAuctionItemsToBot;
@@ -428,8 +433,8 @@ private:
 public:
     std::vector<std::string> GetStatus();
     uint64 GetSellerQuote(uint32 item, uint32 house);
-    bool GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer);
-    uint64 GetBuyerReference(uint32 item, uint32 house);
+    bool GetReferenceBuyerOffer(uint32 item, uint32 house, std::uint64_t& offer, bool ignoreDailyLimit = false);
+    uint64 GetBuyerReference(uint32 item, uint32 house, bool bisPremium = false);
     uint64 GetPricingErrorPrice(ItemTemplate const* proto, uint32 house);
     void RebuildSellerCatalog();
     void PopulateMaterialStock();
