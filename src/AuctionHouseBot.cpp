@@ -950,6 +950,52 @@ void AuctionHouseBot::PopulateCraftedPricing()
                 }
     }
 
+    // Expected contents of openable items (item_loot_template, following references).
+    // Quest-only items and rows outside the default loot mode (0 counts as 1, as in the core)
+    // never drop from an opened item. Like the core's loader, skip MinCount 0 rows and items
+    // without a template, and still follow references marked QuestRequired.
+    ContainerContents.clear();
+    if (ContainerFloorEnabled)
+    {
+        auto load = [](char const* table, AhBotPricing::DropTables& tables)
+        {
+            QueryResult loot = WorldDatabase.Query("SELECT Entry, Item, Reference, Chance, GroupId, MinCount, MaxCount "
+                "FROM {} WHERE (QuestRequired = 0 OR Reference != 0) AND MinCount > 0 "
+                "AND (LootMode = 0 OR (LootMode & 1) != 0)", table);
+            if (!loot)
+                return;
+            do
+            {
+                Field* fields = loot->Fetch();
+                uint32 reference = std::abs(fields[2].Get<int32>());
+                if (!reference && !sObjectMgr->GetItemTemplate(fields[1].Get<uint32>()))
+                    continue;
+                tables[fields[0].Get<uint32>()].push_back({fields[1].Get<uint32>(), fields[3].Get<float>(),
+                    fields[4].Get<uint8>(), fields[5].Get<uint8>(), fields[6].Get<uint8>(), reference});
+            } while (loot->NextRow());
+        };
+        AhBotPricing::DropTables containers, references;
+        load("item_loot_template", containers);
+        load("reference_loot_template", references);
+        for (auto const& [id, container] : *sObjectMgr->GetItemTemplateStore())
+        {
+            if (!container.HasFlag(ITEM_FLAG_HAS_LOOT))
+                continue;
+            auto rows = containers.find(id);
+            if (rows == containers.end() && !container.MaxMoneyLoot)
+                continue;
+            // An item dropping itself would price off its own quote; leave it out.
+            auto& contents = ContainerContents[id];
+            if (rows != containers.end())
+                for (auto const& [item, count] : AhBotPricing::ExpectedDrops(rows->second, &references))
+                    if (item != id && sObjectMgr->GetItemTemplate(item))
+                    {
+                        contents[item] = count;
+                        model.items.try_emplace(item);
+                    }
+        }
+    }
+
     // Glyph item -> minor, from the glyph its spell applies.
     GlyphIsMinor.clear();
     if (GlyphPricingEnabled)
@@ -1026,6 +1072,22 @@ bool AuctionHouseBot::ApplyCraftedPricing(ItemTemplate const* proto, AuctionHous
         for (auto const& [material, count] : yields->second)
             value += it->second.Get(material).reference * count;
         minimum = std::max(minimum, value * DisenchantFloorPercent / 100);
+    }
+    // Never cheaper than what opening it pays out. Soulbound contents only sell to a vendor.
+    auto contents = ContainerContents.find(proto->ItemId);
+    if (contents != ContainerContents.end())
+    {
+        double value = AhBotPricing::ContainerValue(contents->second, proto->MinMoneyLoot, proto->MaxMoneyLoot,
+            [&](uint32 item)
+            {
+                auto content = sObjectMgr->GetItemTemplate(item);
+                if (!content)
+                    return 0.0;
+                if (content->Bonding == BIND_WHEN_PICKED_UP || content->Bonding == BIND_QUEST_ITEM)
+                    return double(content->SellPrice);
+                return it->second.Get(item).reference;
+            });
+        minimum = std::max(minimum, value * ContainerFloorPercent / 100);
     }
     AhBotPricing::RaiseToFloor(minimum, std::min<uint64>(MaxBuyoutPriceInCopper, UINT32_MAX), bid, buyout);
     if (ProgressionPricingEnabled && AhBotPricing::IsProgressionBis(proto->ItemId))
@@ -2948,6 +3010,8 @@ void AuctionHouseBot::InitializeConfiguration()
     VendorPriceFloorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.VendorPriceFloor.Percent", 100), 1u, 1000u);
     DisenchantFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.DisenchantFloor.Enabled", false);
     DisenchantFloorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.DisenchantFloor.Percent", 100), 1u, 1000u);
+    ContainerFloorEnabled = sConfigMgr->GetOption<bool>("AuctionHouseBot.ContainerFloor.Enabled", false);
+    ContainerFloorPercent = std::clamp(sConfigMgr->GetOption<uint32>("AuctionHouseBot.ContainerFloor.Percent", 100), 1u, 1000u);
     CraftedPricingReady = false;
     CraftedPricingModels.clear();
 
