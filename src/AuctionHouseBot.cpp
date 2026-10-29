@@ -1359,15 +1359,19 @@ void AuctionHouseBot::LoadBisDailyBuys()
 
 // Counts in memory and, in the purchase's own transaction, in the DB. The upsert adds to the
 // stored day, so writes landing out of order on several DB workers can't lose units.
+// The row alias needs its own column names: with none, MySQL can't tell new.day from day, the
+// statement fails and takes the whole buyout transaction with it (mails, auction delete), which
+// left sold auctions in the DB to come back as expired after a restart.
 void AuctionHouseBot::RecordBisDailyBuy(uint32 house, uint32 item, uint32 units, CharacterDatabaseTransaction trans)
 {
     int64 today = time(nullptr) / DAY;
     AhBotPricing::DailyRecord(BisDailyBuys[{house, item}], today, units);
     if (!ProgressionBuyerDailyLimit)
         return;
-    trans->Append("INSERT INTO `mod_ahbot_bis_daily_buys` (`house`, `item`, `day`, `units`) VALUES ({}, {}, {}, {}) AS new "
-        "ON DUPLICATE KEY UPDATE `units` = IF(new.`day` > `day`, new.`units`, IF(new.`day` = `day`, `units` + new.`units`, `units`)), "
-        "`day` = GREATEST(`day`, new.`day`)", house, item, today, units);
+    trans->Append("INSERT INTO `mod_ahbot_bis_daily_buys` (`house`, `item`, `day`, `units`) VALUES ({}, {}, {}, {}) "
+        "AS new (`new_house`, `new_item`, `new_day`, `new_units`) "
+        "ON DUPLICATE KEY UPDATE `units` = IF(`new_day` > `day`, `new_units`, IF(`new_day` = `day`, `units` + `new_units`, `units`)), "
+        "`day` = GREATEST(`day`, `new_day`)", house, item, today, units);
 }
 
 // For RetailAH's hint: how many more of a BiS item the bot takes today. Only items it would
