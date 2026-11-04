@@ -725,7 +725,7 @@ void AuctionHouseBot::PopulateCraftedPricing()
     // Only actual gold vendor offers count. Template BuyPrice without an offer,
     // or token/currency purchases, is not a usable gold alternative.
     QueryResult bagVendors = WorldDatabase.Query(
-        "SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0");
+        "SELECT DISTINCT item FROM npc_vendor WHERE item > 0 AND ExtendedCost = 0");
     if (bagVendors)
     {
         do
@@ -919,7 +919,7 @@ void AuctionHouseBot::PopulateCraftedPricing()
         }
         // Only open gold offers: no reputation, no limited stock, no token cost.
         QueryResult recipeVendors = WorldDatabase.Query(
-            "SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0 AND maxcount = 0");
+            "SELECT DISTINCT item FROM npc_vendor WHERE item > 0 AND ExtendedCost = 0 AND maxcount = 0");
         if (recipeVendors)
         {
             do
@@ -937,7 +937,7 @@ void AuctionHouseBot::PopulateCraftedPricing()
     bool referenceBuyers = ReferenceBuyerPricingEnabled || ProgressionBuyerPricingEnabled;
     if (VendorPriceFloorEnabled || referenceBuyers)
     {
-        QueryResult vendors = WorldDatabase.Query("SELECT DISTINCT item FROM npc_vendor WHERE ExtendedCost = 0");
+        QueryResult vendors = WorldDatabase.Query("SELECT DISTINCT item FROM npc_vendor WHERE item > 0 AND ExtendedCost = 0");
         if (vendors)
         {
             do
